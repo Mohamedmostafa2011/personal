@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>الفيديو المرتبط — الأدب في العصر الجاهلي</title>
+<style>
+:root{
+  --bg:#070b10; --panel:rgba(16,26,35,.88); --line:rgba(120,180,200,.18);
+  --ink:#e8f2f6; --dim:#a9bfcb; --faint:#7d95a3; --gold:#f2b544; --teal:#38d6bd;
+  --rose:#ff7a90; --green:#57d98a;
+  --ff:"Segoe UI","Noto Naskh Arabic","Noto Sans Arabic","Cairo","Tajawal",Tahoma,Arial,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{height:100%}
+body{
+  margin:0;background:
+    radial-gradient(900px 600px at 80% -10%, rgba(56,214,189,.10), transparent 60%),
+    radial-gradient(700px 500px at 0% 10%, rgba(242,181,68,.08), transparent 55%),
+    linear-gradient(180deg,#070b10,#0b1219);
+  color:var(--ink);font-family:var(--ff);display:flex;flex-direction:column;gap:12px;padding:14px;
+}
+header{
+  display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+  border:1px solid var(--line);border-radius:16px;padding:12px 16px;background:var(--panel)
+}
+h1{margin:0;font-size:17px;font-weight:800}
+header p{margin:2px 0 0;font-size:12.5px;color:var(--dim)}
+.status{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700}
+.dot{width:11px;height:11px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 4px rgba(255,255,255,.05)}
+.dot.on{background:var(--green);box-shadow:0 0 0 4px rgba(87,217,138,.18);animation:p 2.4s infinite}
+.dot.wait{background:var(--gold);box-shadow:0 0 0 4px rgba(242,181,68,.18);animation:p 1.2s infinite}
+.dot.err{background:var(--rose);box-shadow:0 0 0 4px rgba(255,122,144,.2)}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.45}}
+.stage{
+  flex:1 1 auto;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#000;
+  box-shadow:0 24px 60px rgba(0,0,0,.6);position:relative
+}
+#player,#player iframe{width:100%;height:100%;display:block;border:0}
+.bar{
+  display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+  border:1px solid var(--line);border-radius:16px;padding:11px 15px;background:var(--panel);font-size:12.8px;color:var(--dim)
+}
+.bar .t{font-variant-numeric:tabular-nums;direction:ltr;color:#fff;font-weight:700}
+.btn{
+  border:1px solid rgba(120,180,200,.3);background:rgba(255,255,255,.05);color:var(--ink);padding:8px 13px;
+  border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;gap:7px;align-items:center;transition:.16s;font-family:inherit
+}
+.btn:hover{background:rgba(255,255,255,.1)}
+.btn.gold{background:linear-gradient(135deg,#f2b544,#e08f1e);border-color:transparent;color:#1a1204}
+.msg{border-radius:14px;padding:12px 15px;font-size:13.4px;line-height:1.8;border:1px solid}
+.msg.warn{border-color:rgba(255,122,144,.4);background:rgba(255,122,144,.1);color:#ffdde2}
+.msg.info{border-color:rgba(111,182,255,.35);background:rgba(111,182,255,.1);color:#dcecff}
+.msg b{color:#fff}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;background:rgba(255,255,255,.1);padding:1px 6px;border-radius:6px;direction:ltr;display:inline-block;font-size:12px}
+@media (max-width:620px){h1{font-size:15px}.bar{font-size:12px}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>الفيديو المرتبط باللوحة التعليمية</h1>
+    <p>الأدب في العصر الجاهلي — الشعر الجاهلي · أ/ عمر ياقوت</p>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span class="status"><span class="dot" id="dot"></span><span id="stateTxt">جارٍ تحميل المشغّل…</span></span>
+    <button class="btn" id="focusBoard" type="button">العودة إلى اللوحة</button>
+  </div>
+</header>
+
+<div class="msg warn" id="noOpener" hidden>
+  <b>هذه الصفحة تابعة للّوحة التعليمية.</b>
+  لم يتم فتحها من اللوحة، لذلك لن يعمل التزامن. افتح <a href="index.html" style="color:#fff">صفحة اللوحة</a> ثم اضغط «افتح الفيديو المرتبط».
+</div>
+
+<div class="msg warn" id="errBox" hidden></div>
+
+<div class="stage"><div id="player"></div></div>
+
+<div class="bar">
+  <span>الزمن الحالي: <span class="t" id="tNow">00:00</span> / <span class="t" id="tDur">--:--</span></span>
+  <span id="rateTxt">السرعة: 1×</span>
+  <span style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn" id="syncNow" type="button">مزامنة الآن</button>
+    <a class="btn" href="https://www.youtube.com/watch?v=5QrGXNHTyEA" target="_blank" rel="noopener">فتح على يوتيوب</a>
+  </span>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var VIDEO_ID = "5QrGXNHTyEA";
+var TARGET_ORIGIN = (location.origin && location.origin !== "null") ? location.origin : "*";
+var STRICT_ORIGIN = TARGET_ORIGIN !== "*";
+
+var player = null, ready = false, lastRate = 1;
+var dot = document.getElementById("dot");
+var stateTxt = document.getElementById("stateTxt");
+var errBox = document.getElementById("errBox");
+var tNow = document.getElementById("tNow");
+var tDur = document.getElementById("tDur");
+var rateTxt = document.getElementById("rateTxt");
+
+function fmt(t){
+  t = Math.max(0, Math.floor(t || 0));
+  var m = Math.floor(t/60), s = t%60;
+  return (m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+}
+function setStatus(kind, text){
+  dot.className = "dot" + (kind ? " " + kind : "");
+  stateTxt.textContent = text;
+}
+
+/* ---------- الاتصال باللوحة ---------- */
+function board(){
+  try { if (window.opener && !window.opener.closed) return window.opener; } catch(e){}
+  return null;
+}
+function sendToBoard(msg){
+  var w = board();
+  if (!w) return false;
+  msg.source = "linked-video";
+  try { w.postMessage(msg, TARGET_ORIGIN); return true; } catch(e){ return false; }
+}
+if (!board()) document.getElementById("noOpener").hidden = false;
+
+document.getElementById("focusBoard").addEventListener("click", function(){
+  var w = board();
+  if (w){ try { w.focus(); } catch(e){} }
+  else location.href = "index.html";
+});
+document.getElementById("syncNow").addEventListener("click", beat);
+
+/* ---------- تحميل واجهة يوتيوب ---------- */
+sendToBoard({ type:"boot", time:0, state:-1 });
+setStatus("wait", "جارٍ تحميل مشغّل يوتيوب…");
+
+var apiTimer = setTimeout(function(){
+  if (!ready){
+    setStatus("err", "لم تستجب واجهة يوتيوب");
+    showErr("تعذّر تحميل واجهة يوتيوب (YouTube IFrame API). تحقّق من اتصال الشبكة أو من حاجب الإعلانات، ثم حدّث الصفحة.");
+    sendToBoard({ type:"error", code:"api-timeout" });
+  }
+}, 12000);
+
+var tag = document.createElement("script");
+tag.src = "https://www.youtube.com/iframe_api";
+tag.async = true;
+tag.onerror = function(){
+  setStatus("err", "تعذّر تحميل واجهة يوتيوب");
+  showErr("فشل تحميل <code>https://www.youtube.com/iframe_api</code>. قد يكون السبب انقطاع الشبكة أو حاجب إعلانات.");
+  sendToBoard({ type:"error", code:"api-load-failed" });
+};
+document.head.appendChild(tag);
+
+function showErr(html){ errBox.innerHTML = html; errBox.hidden = false; }
+
+window.onYouTubeIframeAPIReady = function(){
+  player = new YT.Player("player", {
+    videoId: VIDEO_ID,
+    host: "https://www.youtube.com",
+    playerVars: {
+      enablejsapi: 1,
+      origin: location.origin,
+      widget_referrer: location.href,
+      rel: 0,
+      modestbranding: 1,
+      playsinline: 1,
+      hl: "ar"
+    },
+    events: {
+      onReady: onReady,
+      onStateChange: onStateChange,
+      onPlaybackRateChange: onRateChange,
+      onError: onError
+    }
+  });
+};
+
+function onReady(){
+  clearTimeout(apiTimer);
+  ready = true;
+  var f = document.querySelector("#player iframe");
+  if (f){
+    f.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+    f.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+    f.setAttribute("allowfullscreen", "");
+    f.setAttribute("title", "الأدب في العصر الجاهلي — الشعر الجاهلي");
+  }
+  var d = safe(function(){ return player.getDuration(); }, 0);
+  tDur.textContent = fmt(d);
+  setStatus(board() ? "on" : "wait", board() ? "متصل باللوحة — التزامن يعمل" : "المشغّل جاهز (بدون لوحة مرتبطة)");
+  sendToBoard({ type:"ready", time:0, state:-1, duration:d });
+  setInterval(beat, 250);
+}
+
+function safe(fn, dflt){ try { var v = fn(); return (typeof v === "number" && isFinite(v)) ? v : dflt; } catch(e){ return dflt; } }
+
+function beat(){
+  if (!ready || !player) return;
+  var t = safe(function(){ return player.getCurrentTime(); }, 0);
+  var st = safe(function(){ return player.getPlayerState(); }, -1);
+  var d = safe(function(){ return player.getDuration(); }, 0);
+  var r = safe(function(){ return player.getPlaybackRate(); }, 1);
+  tNow.textContent = fmt(t);
+  if (d) tDur.textContent = fmt(d);
+  var ok = sendToBoard({ type:"sync", time:t, state:st, duration:d, rate:r });
+  if (!ok && dot.className.indexOf("err") === -1 && !board()){
+    setStatus("wait", "المشغّل يعمل — اللوحة غير مرتبطة");
+  }
+}
+
+function onStateChange(e){
+  sendToBoard({ type:"state", state:e.data, time: safe(function(){ return player.getCurrentTime(); }, 0) });
+  if (board()) setStatus("on", e.data === 1 ? "يعمل — واللوحة تتابعه" : (e.data === 2 ? "متوقّف مؤقتًا — اللوحة مجمّدة عند الزمن نفسه" : "متصل باللوحة — التزامن يعمل"));
+}
+function onRateChange(e){
+  lastRate = e.data || 1;
+  rateTxt.textContent = "السرعة: " + lastRate + "×";
+  sendToBoard({ type:"sync", time: safe(function(){ return player.getCurrentTime(); }, 0),
+                state: safe(function(){ return player.getPlayerState(); }, -1), rate: lastRate });
+}
+function onError(e){
+  var code = e && e.data;
+  setStatus("err", "خطأ في المشغّل (" + code + ")");
+  var msg;
+  if (code === 153 || code === 150 || code === 101){
+    msg = "<b>خطأ " + code + ":</b> مالك الفيديو يمنع التضمين من مصادر غير معروفة، أو أن الصفحة تُفتح من <code>file://</code>. " +
+          "انشر المجلد عبر HTTPS (مثل GitHub Pages) وافتحه من رابط الموقع، ولا تفتحه كملف محلي. " +
+          "وإن استمرّ الخطأ استخدم زرّ «فتح على يوتيوب» — لكن تبويب يوتيوب العادي لا يمكن مزامنته بسبب قيود الأمان بين المصادر المختلفة.";
+  } else if (code === 2){
+    msg = "<b>خطأ 2:</b> معرّف الفيديو غير صالح.";
+  } else if (code === 5){
+    msg = "<b>خطأ 5:</b> مشكلة في مشغّل HTML5. جرّب متصفحًا آخر أو حدّث الصفحة.";
+  } else if (code === 100){
+    msg = "<b>خطأ 100:</b> الفيديو غير موجود أو تم حذفه أو جعله خاصًّا.";
+  } else {
+    msg = "<b>خطأ " + code + ":</b> تعذّر تشغيل الفيديو داخل هذا المشغّل.";
+  }
+  showErr(msg);
+  sendToBoard({ type:"error", code:code, time:0 });
+}
+
+/* ---------- استقبال أوامر اللوحة ---------- */
+window.addEventListener("message", function(ev){
+  if (STRICT_ORIGIN && ev.origin !== location.origin) return;
+  var d = ev.data;
+  if (!d || typeof d !== "object" || d.source !== "teaching-board") return;
+  if (typeof d.command !== "string") return;
+  if (!player || !ready){
+    if (d.command === "ping") sendToBoard({ type:"boot", time:0, state:-1 });
+    return;
+  }
+  try {
+    switch(d.command){
+      case "play":  player.playVideo(); break;
+      case "pause": player.pauseVideo(); break;
+      case "seek":
+        if (typeof d.time === "number" && isFinite(d.time)){
+          player.seekTo(Math.max(0, d.time), true);
+          beat();
+        }
+        break;
+      case "rate":
+        if (typeof d.rate === "number" && d.rate > 0){ player.setPlaybackRate(d.rate); }
+        break;
+      case "ping":
+        sendToBoard({ type:"ready", time: safe(function(){ return player.getCurrentTime(); }, 0),
+                      state: safe(function(){ return player.getPlayerState(); }, -1),
+                      duration: safe(function(){ return player.getDuration(); }, 0) });
+        break;
+    }
+  } catch(err){ /* تجاهُل أخطاء المشغّل العابرة */ }
+});
+
+/* ---------- الإغلاق ---------- */
+window.addEventListener("pagehide", function(){ sendToBoard({ type:"closed", time:0, state:-1 }); });
+window.addEventListener("beforeunload", function(){ sendToBoard({ type:"closed", time:0, state:-1 }); });
+
+})();
+</script>
+</body>
+</html>

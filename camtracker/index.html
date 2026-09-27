@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FaceCam — Auto-Framing Virtual Cam Source</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#14181d; --line:#232a32; --txt:#e6edf3; --dim:#8b97a5;
+    --accent:#4cc2ff; --good:#3ddc97; --bad:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);flex:0 0 auto}
+  header h1{font-size:14px;margin:0;font-weight:600;letter-spacing:.3px}
+  .pill{font-size:11px;padding:3px 8px;border-radius:99px;background:#1b2027;color:var(--dim);border:1px solid var(--line)}
+  .pill.on{color:var(--good);border-color:#204b3b}
+  .pill.err{color:var(--bad);border-color:#4b2020}
+  main{flex:1;display:flex;min-height:0}
+  #stage{flex:1;display:flex;align-items:center;justify-content:center;background:#000;position:relative;min-width:0}
+  #out{max-width:100%;max-height:100%;display:block;background:#000}
+  #stage.clean header,#stage.clean aside{display:none}
+  aside{width:300px;flex:0 0 300px;border-left:1px solid var(--line);background:var(--panel);
+    overflow-y:auto;padding:12px 14px 40px}
+  aside h2{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);
+    margin:18px 0 8px;font-weight:600}
+  aside h2:first-child{margin-top:0}
+  label{display:block;margin:10px 0 4px;color:var(--dim);font-size:12px;display:flex;justify-content:space-between}
+  label b{color:var(--txt);font-weight:500;font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  select,button{width:100%;padding:7px 9px;background:#1b2027;color:var(--txt);
+    border:1px solid var(--line);border-radius:7px;font:inherit}
+  button{cursor:pointer;font-weight:600}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#04121c;border-color:var(--accent)}
+  .row{display:flex;gap:8px}
+  .chk{display:flex;align-items:center;gap:8px;margin:8px 0;color:var(--dim);font-size:12px;cursor:pointer}
+  .chk input{accent-color:var(--accent)}
+  .stats{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:12px;
+    font-variant-numeric:tabular-nums;color:var(--dim)}
+  .stats b{color:var(--txt);font-weight:500}
+  .help{font-size:11.5px;color:var(--dim);line-height:1.5}
+  .help code{background:#1b2027;padding:1px 4px;border-radius:4px;color:#b9c6d3}
+  video{display:none}
+  .banner{position:absolute;inset:auto 0 0 0;padding:8px 12px;background:#2a1b1b;
+    color:#ffb4b4;font-size:12px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>FaceCam · auto-framing source</h1>
+  <span class="pill" id="pEngine">engine: —</span>
+  <span class="pill" id="pFps">— fps</span>
+  <span class="pill" id="pDet">det — ms</span>
+  <span class="pill" id="pLock">no face</span>
+  <span style="flex:1"></span>
+  <span class="pill">OBS → Browser Source → Virtual Camera</span>
+</header>
+
+<main>
+  <div id="stage">
+    <canvas id="out" width="1280" height="720"></canvas>
+    <div class="banner" id="banner"></div>
+  </div>
+
+  <aside>
+    <h2>Camera</h2>
+    <select id="devices"></select>
+    <div class="row" style="margin-top:8px">
+      <button class="primary" id="btnStart">Start</button>
+      <button id="btnStop">Stop</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnRefresh">Refresh list</button>
+      <button id="btnNext">Next cam →</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnDiag">Run diagnostics</button>
+    </div>
+    <pre id="diag" style="display:none;white-space:pre-wrap;font-size:10.5px;
+      background:#0f1318;border:1px solid var(--line);border-radius:7px;padding:8px;
+      margin-top:8px;color:#9fb0c0;max-height:260px;overflow:auto"></pre>
+    <p class="help" id="devInfo" style="margin-top:8px"></p>
+
+    <h2>Framing</h2>
+    <label>Zoom / tightness <b id="vZoom">2.6×</b></label>
+    <input type="range" id="zoom" min="1.2" max="5" step="0.05" value="2.6">
+    <label>Vertical offset (headroom) <b id="vOff">-0.06</b></label>
+    <input type="range" id="voff" min="-0.35" max="0.35" step="0.01" value="-0.06">
+    <label>Smoothing <b id="vSm">0.88</b></label>
+    <input type="range" id="smooth" min="0" max="0.98" step="0.01" value="0.88">
+    <label>Dead zone (anti-jitter) <b id="vDz">0.035</b></label>
+    <input type="range" id="dead" min="0" max="0.15" step="0.005" value="0.035">
+    <label>Max pan speed <b id="vSp">0.9</b></label>
+    <input type="range" id="speed" min="0.1" max="3" step="0.05" value="0.9">
+
+    <h2>Performance</h2>
+    <label>Detect rate <b id="vHz">15 Hz</b></label>
+    <input type="range" id="hz" min="5" max="60" step="1" value="15">
+    <label>Detector input width <b id="vDw">256 px</b></label>
+    <input type="range" id="dw" min="128" max="512" step="32" value="256">
+    <label>Output size <b id="vRes">1280×720</b></label>
+    <input type="range" id="res" min="0" max="3" step="1" value="1">
+    <div class="chk"><input type="checkbox" id="mirror" checked><span>Mirror (selfie view)</span></div>
+    <div class="chk"><input type="checkbox" id="gpu" checked><span>GPU delegate</span></div>
+    <div class="chk"><input type="checkbox" id="debug"><span>Show tracking box</span></div>
+    <div class="chk"><input type="checkbox" id="clean"><span>Clean mode (canvas only)</span></div>
+
+    <h2>Stats</h2>
+    <div class="stats">
+      <span>render fps</span><b id="sFps">—</b>
+      <span>detect time</span><b id="sDet">—</b>
+      <span>source</span><b id="sSrc">—</b>
+      <span>engine</span><b id="sEng">—</b>
+      <span>crop</span><b id="sCrop">—</b>
+    </div>
+
+    <h2>Make it a real webcam</h2>
+    <p class="help">
+      1. Install <b>OBS Studio</b> (free).<br>
+      2. Add source → <b>Browser</b>, point it at this page's URL (or
+      <code>Local file</code> → this .html).<br>
+      3. Width <b>1280</b>, Height <b>720</b>, FPS <b>30</b>, tick
+      <code>Control audio via OBS</code> off.<br>
+      4. Tick <b>Clean mode</b> here so only the framed canvas renders.<br>
+      5. OBS → <b>Start Virtual Camera</b>. Now Zoom / Meet / Discord / OBS-aware
+      apps can pick “OBS Virtual Camera”.<br><br>
+      A web page cannot register an OS camera device by itself — OBS (or
+      Snap Camera / Camo) is the bridge. Everything else, including the tracking,
+      runs here.
+    </p>
+  </aside>
+</main>
+
+<video id="vid" playsinline muted></video>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const vid = $('vid'), out = $('out'), ctx = out.getContext('2d', {alpha:false, desynchronized:true});
+
+const RES = [[854,480],[1280,720],[1600,900],[1920,1080]];
+
+const S = {
+  zoom:2.6, voff:-0.06, smooth:0.88, dead:0.035, speed:0.9,
+  hz:15, dw:256, mirror:true, gpu:true, debug:false
+};
+
+/* ---------- UI wiring ---------- */
+const bind = (id, key, fmt, out_) => {
+  const el = $(id), lab = $(out_);
+  const upd = () => { S[key] = parseFloat(el.value); lab.textContent = fmt(S[key]); };
+  el.addEventListener('input', upd); upd();
+};
+bind('zoom','zoom',v=>v.toFixed(2)+'×','vZoom');
+bind('voff','voff',v=>v.toFixed(2),'vOff');
+bind('smooth','smooth',v=>v.toFixed(2),'vSm');
+bind('dead','dead',v=>v.toFixed(3),'vDz');
+bind('speed','speed',v=>v.toFixed(2),'vSp');
+bind('hz','hz',v=>v+' Hz','vHz');
+bind('dw','dw',v=>v+' px','vDw');
+$('res').addEventListener('input', e=>{
+  const [w,h] = RES[+e.target.value]; out.width=w; out.height=h;
+  $('vRes').textContent = w+'×'+h;
+});
+$('mirror').onchange = e => S.mirror = e.target.checked;
+$('debug').onchange  = e => S.debug  = e.target.checked;
+$('clean').onchange  = e => {
+  document.querySelector('header').style.display = e.target.checked?'none':'';
+  document.querySelector('aside').style.display  = e.target.checked?'none':'';
+  document.body.style.background = e.target.checked?'#000':'';
+};
+$('gpu').onchange = async e => { S.gpu = e.target.checked; await initEngine(true); };
+
+function banner(msg){ const b=$('banner'); b.textContent=msg; b.style.display=msg?'block':'none'; }
+
+/* ---------- detector engine ---------- */
+let engine = 'none', mpDetector = null, nativeDetector = null;
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18';
+
+async function initEngine(force=false){
+  if (mpDetector && !force) return;
+  if (mpDetector){ try{ mpDetector.close(); }catch{} mpDetector = null; }
+  try{
+    const {FilesetResolver, FaceDetector} = await import(MP + '/vision_bundle.mjs');
+    const fileset = await FilesetResolver.forVisionTasks(MP + '/wasm');
+    mpDetector = await FaceDetector.createFromOptions(fileset, {
+      baseOptions:{
+        modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite',
+        delegate: S.gpu ? 'GPU' : 'CPU'
+      },
+      runningMode:'VIDEO', minDetectionConfidence:0.5
+    });
+    engine = 'blazeface-' + (S.gpu?'gpu':'cpu');
+    banner('');
+  }catch(err){
+    console.warn('MediaPipe unavailable:', err);
+    if ('FaceDetector' in window){
+      try{ nativeDetector = new window.FaceDetector({fastMode:true, maxDetectedFaces:1});
+           engine = 'native'; }
+      catch{ engine = 'motion'; }
+    } else engine = 'motion';
+    banner('No network / MediaPipe blocked — using fallback tracker ('+engine+'). Open the page over http(s) in Chrome for full accuracy.');
+  }
+  $('pEngine').textContent = 'engine: ' + engine;
+  $('sEng').textContent = engine;
+}
+
+/* work canvas: downscaled frames for the detector (big perf win) */
+const work = document.createElement('canvas');
+const wctx = work.getContext('2d', {alpha:false, willReadFrequently:true});
+
+/* ultra-light fallback: skin-tone centroid on a tiny buffer */
+let fbPrev = null;
+function motionTrack(w,h){
+  const d = wctx.getImageData(0,0,w,h).data;
+  let sx=0, sy=0, n=0;
+  for (let y=0;y<h;y+=2){
+    for (let x=0;x<w;x+=2){
+      const i=(y*w+x)*4, r=d[i], g=d[i+1], b=d[i+2];
+      if (r>70 && g>40 && b>20 && r>g+12 && r>b+12 && Math.max(r,g,b)-Math.min(r,g,b)>15){
+        sx+=x; sy+=y; n++;
+      }
+    }
+  }
+  if (n < (w*h)/400) return null;
+  const cx=sx/n, cy=sy/n;
+  const size = Math.sqrt(n*4) * 1.5;
+  return {x:(cx-size/2)/w, y:(cy-size/2)/h, w:size/w, h:size/h, score:0.4};
+}
+
+/* ---------- tracking state ---------- */
+let target = null;                 // latest normalised detection {x,y,w,h}
+let cur = {cx:0.5, cy:0.45, s:0.45}; // smoothed crop (normalised centre + size)
+let has = false, lastSeen = 0, lastDet = 0, detMs = 0;
+
+async function detect(now){
+  const vw = vid.videoWidth, vh = vid.videoHeight;
+  if (!vw) return;
+  const dw = Math.round(S.dw), dh = Math.round(dw * vh / vw);
+  if (work.width !== dw){ work.width = dw; work.height = dh; }
+  wctx.drawImage(vid, 0, 0, dw, dh);
+
+  const t0 = performance.now();
+  let box = null;
+  try{
+    if (mpDetector){
+      const r = mpDetector.detectForVideo(work, now);
+      if (r.detections && r.detections.length){
+        // pick largest face
+        let best = r.detections[0];
+        for (const d of r.detections)
+          if (d.boundingBox.width*d.boundingBox.height >
+              best.boundingBox.width*best.boundingBox.height) best = d;
+        const b = best.boundingBox;
+        box = {x:b.originX/dw, y:b.originY/dh, w:b.width/dw, h:b.height/dh};
+      }
+    } else if (nativeDetector){
+      const f = await nativeDetector.detect(work);
+      if (f.length){ const b=f[0].boundingBox;
+        box = {x:b.x/dw, y:b.y/dh, w:b.width/dw, h:b.height/dh}; }
+    } else {
+      box = motionTrack(dw, dh);
+    }
+  }catch(e){ /* transient */ }
+  detMs = detMs*0.8 + (performance.now()-t0)*0.2;
+
+  if (box){ target = box; has = true; lastSeen = now; }
+  else if (now - lastSeen > 1200){ has = false; }
+}
+
+/* ---------- render loop ---------- */
+let frames = 0, fpsT = performance.now(), fps = 0, lastT = performance.now();
+
+function render(now){
+  const dt = Math.min(0.1, (now - lastT)/1000); lastT = now;
+  const vw = vid.videoWidth, vh = vid.videoHeight;
+  if (!vw){ return; }
+  const ar = out.width / out.height;
+
+  // ---- desired crop from detection ----
+  let want;
+  if (has && target){
+    const fcx = target.x + target.w/2;
+    const fcy = target.y + target.h/2;
+    // crop height (normalised to video height) = face height * zoom factor
+    let ch = Math.min(1, (target.h * vh) * (S.zoom) / vh);
+    ch = Math.min(1, Math.max(0.12, ch));
+    want = {cx:fcx, cy:fcy + S.voff*ch, s:ch};
+  } else {
+    want = {cx:0.5, cy:0.5, s:1};   // graceful fall back to full frame
+  }
+
+  // ---- dead zone: ignore micro movement so the frame feels locked ----
+  const dz = S.dead;
+  const dx = want.cx - cur.cx, dy = want.cy - cur.cy, ds = want.s - cur.s;
+  const moved = Math.hypot(dx, dy) > dz * cur.s || Math.abs(ds) > dz * cur.s;
+
+  if (moved){
+    // frame-rate independent exponential smoothing + speed clamp
+    const k = 1 - Math.pow(1 - (1 - S.smooth), dt * 60);
+    let nx = cur.cx + dx * k, ny = cur.cy + dy * k, ns = cur.s + ds * k * 0.7;
+    const maxStep = S.speed * dt;
+    const stepX = nx-cur.cx, stepY = ny-cur.cy, mag = Math.hypot(stepX, stepY);
+    if (mag > maxStep){ nx = cur.cx + stepX/mag*maxStep; ny = cur.cy + stepY/mag*maxStep; }
+    cur.cx = nx; cur.cy = ny; cur.s = ns;
+  }
+
+  // ---- convert to pixel crop, respect output aspect, clamp to frame ----
+  let ch = Math.max(0.08, Math.min(1, cur.s)) * vh;
+  let cw = ch * ar;
+  if (cw > vw){ cw = vw; ch = cw / ar; }
+  if (ch > vh){ ch = vh; cw = ch * ar; }
+  let cx = cur.cx * vw - cw/2;
+  let cy = cur.cy * vh - ch/2;
+  cx = Math.max(0, Math.min(vw - cw, cx));
+  cy = Math.max(0, Math.min(vh - ch, cy));
+
+  // ---- draw (single GPU-accelerated blit) ----
+  ctx.save();
+  if (S.mirror){ ctx.translate(out.width, 0); ctx.scale(-1, 1); }
+  ctx.drawImage(vid, cx, cy, cw, ch, 0, 0, out.width, out.height);
+  ctx.restore();
+
+  if (S.debug && target){
+    const sx = out.width/cw, sy = out.height/ch;
+    let bx = (target.x*vw - cx)*sx, by = (target.y*vh - cy)*sy;
+    const bw = target.w*vw*sx, bh = target.h*vh*sy;
+    if (S.mirror) bx = out.width - bx - bw;
+    ctx.strokeStyle = has ? '#3ddc97' : '#ff6b6b';
+    ctx.lineWidth = 3; ctx.strokeRect(bx, by, bw, bh);
+  }
+
+  // ---- stats ----
+  frames++;
+  if (now - fpsT > 500){
+    fps = frames*1000/(now-fpsT); frames = 0; fpsT = now;
+    $('pFps').textContent = fps.toFixed(0)+' fps';
+    $('sFps').textContent = fps.toFixed(1);
+    $('pDet').textContent = 'det '+detMs.toFixed(1)+' ms';
+    $('sDet').textContent = detMs.toFixed(2)+' ms';
+    $('sCrop').textContent = Math.round(cw)+'×'+Math.round(ch);
+    const p = $('pLock');
+    p.textContent = has ? 'face locked' : 'no face';
+    p.className = 'pill ' + (has ? 'on' : 'err');
+  }
+}
+
+/* rVFC drives render at exactly camera cadence (no wasted frames). */
+function loop(now, meta){
+  vid.requestVideoFrameCallback(loop);
+  const t = now || performance.now();
+  if (t - lastDet >= 1000/S.hz){ lastDet = t; detect(t); }   // throttled detection
+  render(t);
+}
+function loopRAF(){
+  requestAnimationFrame(loopRAF);
+  const t = performance.now();
+  if (t - lastDet >= 1000/S.hz){ lastDet = t; detect(t); }
+  render(t);
+}
+
+/* ---------- camera ---------- */
+let stream = null, outStream = null;
+
+let devs = [];
+
+/* Labels + the full device list only appear AFTER permission is granted, so we
+   prime permission with a throwaway stream, then enumerate. */
+async function primePermission(){
+  try{
+    const s = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
+    s.getTracks().forEach(t=>t.stop());
+    return true;
+  }catch(e){
+    banner('Camera permission denied or unavailable: '+e.name+' — '+e.message);
+    return false;
+  }
+}
+
+async function listDevices(keep=true){
+  const prev = $('devices').value;
+  devs = (await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
+  $('devices').innerHTML = devs.map((d,i)=>
+    `<option value="${d.deviceId}">${d.label || ('Camera '+(i+1)+' (unlabeled)')}</option>`).join('')
+    || '<option value="">— no camera found —</option>';
+  if (keep && prev && devs.some(d=>d.deviceId===prev)) $('devices').value = prev;
+
+  const unlabeled = devs.some(d=>!d.label);
+  $('devInfo').textContent =
+    devs.length + ' video input' + (devs.length===1?'':'s') + ' detected.' +
+    (unlabeled ? ' Labels hidden until camera permission is granted — click Start once.' : '') +
+    (devs.length <= 1 ? ' If your integrated cam is missing: it may be in use by another app (OBS/Zoom/Teams), disabled in Device Manager, or blocked by a privacy shutter / Fn key.' : '');
+  return devs;
+}
+
+async function start(){
+  stop();
+  let id = $('devices').value;
+
+  // First run: no labels yet -> prime permission, re-enumerate, then open.
+  if (!id || devs.length === 0 || devs.some(d=>!d.label)){
+    const ok = await primePermission();
+    await listDevices(true);
+    if (!ok) return;
+    id = $('devices').value;
+  }
+
+  const attempt = async (constraints) =>
+    navigator.mediaDevices.getUserMedia({video: constraints, audio:false});
+
+  // Empty deviceId (file:// or pre-permission) must NOT be used as an exact constraint.
+  const useId = id && id.length > 0;
+
+  try{
+    try{
+      stream = await attempt({
+        deviceId: useId ? {exact:id} : undefined,
+        width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:30, max:60}
+      });
+    }catch(inner){
+      // Device busy or resolution unsupported -> retry with loose constraints
+      banner('Strict open failed ('+inner.name+'), retrying with relaxed settings…');
+      stream = await attempt(useId ? {deviceId:{ideal:id}} : true);
+      banner('');
+    }
+  }catch(e){
+    banner('Camera error ('+e.name+'): '+e.message +
+      (e.name==='NotReadableError' ? ' — the camera is already in use by another app. Close OBS/Zoom/Teams and retry.' : ''));
+    return;
+  }
+
+  vid.srcObject = stream;
+  await vid.play();
+  const t = stream.getVideoTracks()[0].getSettings();
+  $('sSrc').textContent = (t.width||vid.videoWidth)+'×'+(t.height||vid.videoHeight)+' @'+(t.frameRate?Math.round(t.frameRate):'?');
+  await listDevices();
+  await initEngine();
+
+  outStream = out.captureStream(30);          // this is the framed feed
+  window.faceCamStream = outStream;           // grab from console / other code
+
+  if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) vid.requestVideoFrameCallback(loop);
+  else loopRAF();
+}
+
+function stop(){
+  if (stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+  if (outStream){ outStream.getTracks().forEach(t=>t.stop()); outStream = null; }
+}
+
+$('btnStart').onclick   = start;
+$('btnStop').onclick    = stop;
+$('btnRefresh').onclick = () => listDevices(true);
+$('btnNext').onclick    = async () => {
+  if (devs.length < 2) return;
+  const sel = $('devices');
+  sel.selectedIndex = (sel.selectedIndex + 1) % devs.length;
+  await start();
+};
+$('devices').onchange = () => { if (stream) start(); };
+
+$('btnDiag').onclick = async () => {
+  const el = $('diag'); el.style.display = 'block';
+  el.textContent = 'Probing…';
+  const lines = [];
+  lines.push('secureContext : ' + window.isSecureContext);
+  lines.push('origin        : ' + location.origin);
+  lines.push('userAgent     : ' + navigator.userAgent);
+  try{
+    const p = await navigator.permissions.query({name:'camera'});
+    lines.push('permission    : ' + p.state);
+  }catch{ lines.push('permission    : (not queryable)'); }
+
+  // enumerate BEFORE priming
+  let pre = (await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
+  lines.push('\n-- before permission prime --');
+  pre.forEach((d,i)=>lines.push(`  [${i}] "${d.label||'(no label)'}"  group=${(d.groupId||'').slice(0,8)}  id=${(d.deviceId||'').slice(0,12)}`));
+
+  await primePermission();
+  let post = (await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
+  lines.push('\n-- after permission prime --');
+  post.forEach((d,i)=>lines.push(`  [${i}] "${d.label||'(no label)'}"  group=${(d.groupId||'').slice(0,8)}  id=${(d.deviceId||'').slice(0,12)}`));
+
+  // try to actually OPEN each device and report the real failure reason
+  lines.push('\n-- open test per device --');
+  for (const d of post){
+    try{
+      const c = d.deviceId ? {deviceId:{exact:d.deviceId}} : true;
+      const s = await navigator.mediaDevices.getUserMedia({video:c});
+      const t = s.getVideoTracks()[0].getSettings();
+      lines.push(`  OK   "${d.label||d.deviceId.slice(0,10)}" -> ${t.width}x${t.height}@${Math.round(t.frameRate||0)}`);
+      s.getTracks().forEach(x=>x.stop());
+    }catch(e){
+      lines.push(`  FAIL "${d.label||d.deviceId.slice(0,10)}" -> ${e.name}: ${e.message}`);
+    }
+  }
+  const caps = navigator.mediaDevices.getSupportedConstraints?.() || {};
+  lines.push('\nfacingMode supported: ' + !!caps.facingMode);
+  el.textContent = lines.join('\n');
+  await listDevices(true);
+};
+
+// Hot-plug / permission changes re-populate the list automatically
+navigator.mediaDevices.addEventListener?.('devicechange', () => listDevices(true));
+
+if (location.protocol === 'file:')
+  banner('⚠ Opened as file:// — Chrome/Edge will NOT give real camera access here (empty deviceIds, OverconstrainedError). Run start-facecam.bat in this folder and open http://localhost:8000 instead.');
+else if (!window.isSecureContext)
+  banner('Not a secure context — cameras are only exposed over https:// or http://localhost.');
+
+listDevices(false);
+// autostart (OBS browser source has camera permission pre-granted)
+start();
+</script>
+</body>
+</html>

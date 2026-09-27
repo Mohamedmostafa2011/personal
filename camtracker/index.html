@@ -46,6 +46,12 @@
   video{display:none}
   .banner{position:absolute;inset:auto 0 0 0;padding:8px 12px;background:#2a1b1b;
     color:#ffb4b4;font-size:12px;display:none}
+  .warn{background:#2a2213;border:1px solid #57451c;color:#ffd489;font-size:11.5px;
+    line-height:1.5;padding:8px 10px;border-radius:7px;margin-bottom:10px}
+  .steps{margin:0;padding-left:18px;font-size:11.5px;color:var(--dim);line-height:1.6}
+  .steps li{margin-bottom:7px}
+  .steps b{color:var(--txt)}
+  .tiny{display:block;font-size:10.5px;color:#6f7b88;margin-top:2px}
 </style>
 </head>
 <body>
@@ -117,19 +123,38 @@
       <span>crop</span><b id="sCrop">—</b>
     </div>
 
-    <h2>Make it a real webcam</h2>
+    <h2>Use this in Zoom</h2>
+    <div class="warn">
+      <b>This page cannot appear in Zoom by itself.</b> Browsers are sandboxed and
+      cannot create a camera device. Zoom only sees cameras that have a driver.
+      <b>OBS Virtual Camera</b> is the bridge — without it running, there is nothing
+      for Zoom to pick.
+    </div>
+    <ol class="steps">
+      <li>Install <b>OBS Studio</b> (free) and open it.</li>
+      <li>In <b>Sources</b> click <b>+</b> → <b>Browser</b> → OK.</li>
+      <li>Paste this page's address into <b>URL</b>:
+        <div class="row" style="margin-top:6px">
+          <input id="urlBox" readonly style="flex:1;padding:6px 8px;background:#1b2027;
+            color:#b9c6d3;border:1px solid var(--line);border-radius:6px;font-size:11px">
+          <button id="btnCopy" style="width:auto;padding:6px 10px">Copy</button>
+        </div>
+        <span class="tiny" id="urlWarn"></span>
+      </li>
+      <li>Set <b>Width 1280</b>, <b>Height 720</b>, <b>FPS 30</b> → OK.</li>
+      <li>Tick <b>Clean mode</b> above so OBS captures only the framed video.</li>
+      <li>Right-click the preview → <b>Resize output to source</b> (optional).</li>
+      <li>Click <b>Start Virtual Camera</b> on the right-hand OBS panel.
+        <span class="tiny">This is the step everyone misses.</span></li>
+      <li><b>Fully quit and reopen Zoom</b> — it only scans for cameras at launch.</li>
+      <li>Zoom → Settings → Video → Camera → pick <b>OBS Virtual Camera</b>.</li>
+    </ol>
     <p class="help">
-      1. Install <b>OBS Studio</b> (free).<br>
-      2. Add source → <b>Browser</b>, point it at this page's URL (or
-      <code>Local file</code> → this .html).<br>
-      3. Width <b>1280</b>, Height <b>720</b>, FPS <b>30</b>, tick
-      <code>Control audio via OBS</code> off.<br>
-      4. Tick <b>Clean mode</b> here so only the framed canvas renders.<br>
-      5. OBS → <b>Start Virtual Camera</b>. Now Zoom / Meet / Discord / OBS-aware
-      apps can pick “OBS Virtual Camera”.<br><br>
-      A web page cannot register an OS camera device by itself — OBS (or
-      Snap Camera / Camo) is the bridge. Everything else, including the tracking,
-      runs here.
+      Still not listed in Zoom? The virtual camera button in OBS must say
+      <b>Stop Virtual Camera</b> (meaning it is live). On Windows, run the OBS
+      installer once more and ensure the virtual-camera component is installed.
+      Alternatives to OBS: <b>Camo Studio</b>, <b>Snap Camera</b>, or
+      <code>v4l2loopback</code> on Linux.
     </p>
   </aside>
 </main>
@@ -504,6 +529,21 @@ $('btnDiag').onclick = async () => {
 
 // Hot-plug / permission changes re-populate the list automatically
 navigator.mediaDevices.addEventListener?.('devicechange', () => listDevices(true));
+
+/* ---------- OBS URL helper ---------- */
+{
+  const box = $('urlBox'), warn = $('urlWarn');
+  box.value = location.href.split('#')[0];
+  $('btnCopy').onclick = async () => {
+    try{ await navigator.clipboard.writeText(box.value); }
+    catch{ box.select(); document.execCommand('copy'); }
+    $('btnCopy').textContent = 'Copied'; setTimeout(()=>$('btnCopy').textContent='Copy', 1200);
+  };
+  if (location.protocol === 'file:')
+    warn.textContent = 'You are on file:// — in OBS use "Local file" and browse to this .html instead, and note the camera will not work until you serve over http://localhost.';
+  else
+    warn.textContent = 'Paste this exact URL into the OBS Browser source.';
+}
 
 if (location.protocol === 'file:')
   banner('⚠ Opened as file:// — Chrome/Edge will NOT give real camera access here (empty deviceIds, OverconstrainedError). Run start-facecam.bat in this folder and open http://localhost:8000 instead.');

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>الفيديو المرتبط — التأسيس في البلاغة</title>
+  <style>
+    :root{--mint:#66e3b4;--ink:#eef7f4;--muted:#91aaa6;--line:rgba(255,255,255,.1);--gold:#f1c96b}
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:#051019;color:var(--ink);font-family:Tahoma,"Segoe UI",Arial,sans-serif}
+    body{height:100dvh;display:grid;grid-template-rows:70px minmax(0,1fr) 64px;background:radial-gradient(circle at 14% 0%,rgba(102,227,180,.13),transparent 34%),radial-gradient(circle at 85% 70%,rgba(100,65,190,.11),transparent 37%),#051019;overflow:hidden}
+    .top{display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--line);background:rgba(4,14,22,.92);backdrop-filter:blur(18px)}
+    .title{display:flex;align-items:center;gap:11px}.mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--mint);color:#042017;font-weight:900;box-shadow:0 8px 24px rgba(102,227,180,.2)}
+    .title strong{display:block;font-size:14px}.title span{display:block;color:var(--muted);font-size:10px;margin-top:4px}
+    .state{display:flex;align-items:center;gap:8px;color:#b8f3d9;font-size:11px;padding:8px 11px;border-radius:999px;border:1px solid rgba(102,227,180,.2);background:rgba(102,227,180,.07)}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 4px rgba(241,201,107,.08)}.state.ready .dot{background:var(--mint);box-shadow:0 0 0 4px rgba(102,227,180,.09)}
+    .stage{display:grid;place-items:center;padding:22px;min-height:0}.frame{width:min(1180px,94vw);aspect-ratio:16/9;max-height:calc(100dvh - 178px);background:#000;border-radius:21px;overflow:hidden;border:1px solid rgba(255,255,255,.12);box-shadow:0 28px 80px rgba(0,0,0,.48);position:relative}
+    #player{width:100%;height:100%;border:0;display:block}.error-panel{position:absolute;inset:0;display:none;place-items:center;text-align:center;padding:24px;background:linear-gradient(145deg,#101010,#180d24)}.error-panel.show{display:grid}.error-panel h2{margin:0 0 8px;font-size:22px}.error-panel p{margin:0 auto 16px;color:var(--muted);font-size:12px;line-height:1.8;max-width:560px}.error-panel a{display:inline-block;text-decoration:none;background:#fff;color:#111;padding:10px 15px;border-radius:11px;font-weight:800;font-size:12px}
+    .foot{display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-top:1px solid var(--line);color:var(--muted);font-size:11px}.time{direction:ltr;color:#b8f3d9;font-variant-numeric:tabular-nums}.protocol-warning{display:none;color:#ffd88b}.protocol-warning.show{display:inline}
+    @media(max-width:700px){.top,.foot{padding:0 12px}.stage{padding:8px}.frame{width:100%;border-radius:12px}.title span,.foot>span:first-child{display:none}.state{font-size:9px}body{grid-template-rows:62px minmax(0,1fr) 52px}.frame{max-height:calc(100dvh - 130px)}}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="title"><div class="mark">ك</div><div><strong>فيديو التأسيس في البلاغة</strong><span>تبويب YouTube مرتبط بالسبورة التفاعلية</span></div></div>
+    <div class="state" id="state-wrap"><i class="dot"></i><span id="state">جارٍ تحميل مشغل YouTube…</span></div>
+  </header>
+  <main class="stage">
+    <div class="frame">
+      <iframe id="player" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      <div class="error-panel" id="error-panel"><div><h2>تعذّر تشغيل YouTube داخل الصفحة</h2><p id="error-copy">تأكد من فتح العرض عبر رابط HTTP/HTTPS، وليس مباشرةً كملف محلي.</p><a href="https://www.youtube.com/watch?v=xpndcdEmJVs" target="_blank" rel="noopener">مشاهدة الفيديو على YouTube</a></div></div>
+    </div>
+  </main>
+  <footer class="foot"><span>غيّر الوقت أو أوقف الفيديو هنا؛ ستتحرك السبورة تلقائيًا.</span><span class="protocol-warning" id="protocol-warning">افتح الملف عبر خادم محلي لتجنب Error 153</span><span class="time" id="time">00:00 / 2:49:27</span></footer>
+
+  <script>
+    const VIDEO_ID='xpndcdEmJVs';
+    const DURATION=10167;
+    let player=null,ready=false;
+    const stateEl=document.getElementById('state');
+    const stateWrap=document.getElementById('state-wrap');
+    const timeEl=document.getElementById('time');
+    const errorPanel=document.getElementById('error-panel');
+    const errorCopy=document.getElementById('error-copy');
+    const protocolWarning=document.getElementById('protocol-warning');
+
+    function fmt(x){x=Math.max(0,Math.floor(x||0));const h=Math.floor(x/3600),m=Math.floor((x%3600)/60),s=x%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`}
+    function send(type,extra={}){if(window.opener&&!window.opener.closed)window.opener.postMessage({source:'kana-video',type,...extra},'*')}
+    function setState(text,ok=false){stateEl.textContent=text;stateWrap.classList.toggle('ready',ok)}
+    function showError(copy,code){errorCopy.textContent=copy;errorPanel.classList.add('show');setState(`تعذر تشغيل YouTube${code?' — رمز '+code:''}`,false);send('error',{code:code||'LOAD'})}
+
+    if(location.protocol==='file:'){
+      protocolWarning.classList.add('show');
+      setState('يجب التشغيل عبر HTTP/HTTPS',false);
+    }
+
+    const iframe=document.getElementById('player');
+    const origin=(location.origin&&location.origin!=='null')?location.origin:'';
+    const params=new URLSearchParams({enablejsapi:'1',playsinline:'1',rel:'0',modestbranding:'1'});
+    if(origin)params.set('origin',origin);
+    params.set('widget_referrer',location.href);
+    iframe.src=`https://www.youtube.com/embed/${VIDEO_ID}?${params.toString()}`;
+
+    window.onYouTubeIframeAPIReady=function(){
+      try{
+        player=new YT.Player('player',{
+          events:{
+            onReady:()=>{ready=true;setState('متصل بالسبورة',true);send('ready',{time:player.getCurrentTime()||0,state:player.getPlayerState()});},
+            onStateChange:e=>send('state',{state:e.data,time:player.getCurrentTime()||0}),
+            onError:e=>showError('رفض YouTube تشغيل المشغل المضمّن. افتح العرض من رابط الخادم الحي، ثم أعد فتح تبويب الفيديو.',e.data)
+          }
+        });
+      }catch(err){showError('تعذر تهيئة واجهة YouTube. أعد تحميل الصفحة من خلال HTTP/HTTPS.','API')}
+    };
+
+    const api=document.createElement('script');
+    api.src='https://www.youtube.com/iframe_api';
+    api.async=true;
+    api.onerror=()=>showError('تعذر تنزيل واجهة YouTube. تحقق من الاتصال أو إعدادات منع التتبع.','NETWORK');
+    document.head.appendChild(api);
+
+    window.addEventListener('message',e=>{
+      const d=e.data||{};if(d.source!=='kana-board'||!ready)return;
+      if(d.command==='play')player.playVideo();
+      else if(d.command==='pause')player.pauseVideo();
+      else if(d.command==='seek'&&Number.isFinite(d.time))player.seekTo(Math.max(0,d.time),true);
+      else if(d.command==='rate'&&Number.isFinite(d.rate))player.setPlaybackRate(d.rate);
+      else if(d.command==='ping')send('ready',{time:player.getCurrentTime()||0,state:player.getPlayerState()});
+    });
+
+    setInterval(()=>{
+      if(!ready)return;
+      const t=player.getCurrentTime()||0,st=player.getPlayerState();
+      timeEl.textContent=`${fmt(t)} / 2:49:27`;
+      send('sync',{time:t,state:st});
+    },250);
+
+    window.addEventListener('beforeunload',()=>send('closed'));
+    send('boot');
+  </script>
+</body>
+</html>

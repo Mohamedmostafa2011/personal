@@ -1,0 +1,1 @@
+{"name":"mido-private-dataset-uploader","version":"1.0.0","private":true,"type":"module","scripts":{"test":"node --test"},"dependencies":{"@huggingface/hub":"^2.9.0","busboy":"^1.6.0"}}

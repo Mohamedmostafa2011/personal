@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>404 — Page not found</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0b0d12;color:#e8eaf0;font:15px/1.6 system-ui,-apple-system,Segoe UI,sans-serif;display:grid;place-items:center;padding:24px}
+.wrap{width:min(620px,100%);text-align:center}.code{font-size:clamp(76px,18vw,132px);font-weight:800;letter-spacing:-.09em;line-height:1;color:#f1f3f8}.line{height:1px;background:#262b36;margin:28px auto;width:90px}.muted{color:#9299a8}.status{display:inline-flex;align-items:center;gap:8px;border:1px solid #2b303c;background:#11151d;padding:7px 12px;border-radius:999px;color:#aab1bf;font-size:12px;letter-spacing:.08em;text-transform:uppercase}.dot{width:7px;height:7px;border-radius:50%;background:#ef6464}.message{font-size:17px;margin:18px 0 4px}.hint{font-size:13px;color:#626a79;margin-top:35px}
+.secret{display:inline-grid;place-items:center;width:34px;height:34px;border:1px solid #3a2025;border-radius:9px;background:#191116;color:#f18b8b;font-weight:700;cursor:pointer;margin-top:14px;transition:.15s}
+.secret:hover{background:#28171c;border-color:#8e424b}.secret:focus-visible{outline:2px solid #f18b8b;outline-offset:3px}
+.gate{display:none;margin:24px auto 0;max-width:330px;text-align:left}.gate.show{display:block}.gate label{display:block;font-size:13px;color:#aab1bf;margin-bottom:8px}.gate input{width:100%;padding:13px 14px;border-radius:10px;border:1px solid #343b49;background:#11151d;color:#fff;font-size:16px;outline:none}.gate input:focus{border-color:#8c9bb7}.gate button{width:100%;margin-top:10px;padding:12px;border:0;border-radius:10px;background:#e7eaf0;color:#10131a;font-weight:700;font-size:14px;cursor:pointer}.error{min-height:20px;color:#ff8585;font-size:13px;margin-top:8px}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="status"><span class="dot"></span> Server response · 404</div>
+  <div class="code">404</div>
+  <div class="line"></div>
+  <p class="message">This page could not be found.</p>
+  <p class="muted">The requested resource may have moved or no longer exists.</p>
+  <button class="secret" id="secret" type="button" aria-label="Status marker">?</button>
+  <section class="gate" id="gate">
+    <form id="loginForm">
+      <label for="password">Access key</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Enter password" required>
+      <button type="submit">Unlock</button>
+      <div class="error" id="error" role="alert"></div>
+    </form>
+  </section>
+  <p class="hint">Request ID: <span id="requestId"></span></p>
+</main>
+<script>
+(() => {
+  const secret = document.getElementById('secret');
+  const gate = document.getElementById('gate');
+  const password = document.getElementById('password');
+  const error = document.getElementById('error');
+  let clicks = 0, unlocked = false, audioContext;
+  document.getElementById('requestId').textContent = Math.random().toString(16).slice(2,10).toUpperCase();
+
+  function chime() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      audioContext = audioContext || new Ctx();
+      if (audioContext.state === 'suspended') audioContext.resume();
+      const now = audioContext.currentTime;
+      [659.25, 783.99, 987.77].forEach((freq, i) => {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.type = 'sine'; osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, now + i * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.12, now + i * 0.12 + 0.025);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.12 + 0.28);
+        osc.connect(gain); gain.connect(audioContext.destination);
+        osc.start(now + i * 0.12); osc.stop(now + i * 0.12 + 0.3);
+      });
+    } catch (_) {}
+  }
+
+  secret.addEventListener('click', () => {
+    if (unlocked) return;
+    clicks++;
+    if (clicks >= 5) {
+      unlocked = true;
+      chime();
+      gate.classList.add('show');
+      secret.textContent = '✓';
+      password.focus();
+    }
+  });
+
+  document.getElementById('loginForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    error.textContent = '';
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({password: password.value})
+      });
+      if (!response.ok) {
+        error.textContent = 'Access denied. Check the password and try again.';
+        password.select();
+        return;
+      }
+      window.location.assign('/');
+    } catch (_) {
+      error.textContent = 'Could not reach the local server. Is it running?';
+    }
+  });
+})();
+</script>
+</body></html>

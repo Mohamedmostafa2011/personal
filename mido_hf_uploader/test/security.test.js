@@ -10,3 +10,10 @@ test('signed cookies authenticate and tampering fails',()=>{let s=makeSession();
 test('origin checking',()=>{assert.equal(validOrigin({headers:{origin:'https://example.com',host:'example.com'}}),true);assert.equal(validOrigin({headers:{origin:'https://evil.com',host:'example.com'}}),false)});
 test('login and session',()=>{let res=response();login({method:'POST',headers:{origin:'https://example.com',host:'example.com'},body:{password:'long-test-password'}},res);assert.equal(res.statusCode,200);let r=response();session({method:'GET',headers:{cookie:res.headers['Set-Cookie']}},r);assert.equal(r.body.authenticated,true)});
 test('upload refuses unauthenticated user',async()=>{let res=response();await upload({method:'POST',headers:{origin:'https://example.com',host:'example.com'}},res);assert.equal(res.statusCode,401)});
+
+test('dashboard redirects anonymous users and serves authenticated HTML without filesystem access', async()=>{
+  const {default: dashboard} = await import('../api/dashboard.js');
+  function dashboardResponse(){const r=response();r.writeHead=function(code,headers){this.statusCode=code;Object.assign(this.headers,headers);return this};r.end=function(){return this};r.send=function(body){this.body=body;return this};return r;}
+  let r=dashboardResponse();dashboard({method:'GET',headers:{}},r);assert.equal(r.statusCode,302);assert.equal(r.headers.Location,'/');
+  r=dashboardResponse();dashboard({method:'GET',headers:{cookie:`mido_session=${makeSession()}`}},r);assert.equal(r.statusCode,200);assert.match(r.body,/<title>Uploader — Mido<\/title>/);assert.match(r.body,/\/js\/uploader\.js/);assert.match(r.headers['Content-Type'],/text\/html/);
+});

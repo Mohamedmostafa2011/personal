@@ -1,6 +1,6 @@
 # Mido Private Dataset Uploader
 
-A minimal, password-protected uploader for `MidoSTM11/Mido` on Hugging Face. The initial 404 is intentional: click the small dot in the footer five times to reveal the sign-in field. The dashboard HTML is served by an authenticated function, and uploads are made server-side to the dataset's `main` branch.
+A minimal, password-protected uploader for `MidoSTM11/Mido` on Hugging Face. The initial 404 is intentional: click the small dot in the footer five times to reveal the sign-in field. The dashboard HTML is bundled as `lib/dashboard-html.js` and served by an authenticated function, and uploads are made server-side to the dataset's `main` branch.
 
 ## Deploy to GitHub and Vercel
 

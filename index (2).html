@@ -1,0 +1,1565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0A1122">
+<meta name="description" content="Plan bedtimes and wake-up times around estimated 90-minute sleep cycles, ranked against recommended sleep-duration ranges.">
+<title>Sleep Cycle Calculator — bedtimes and wake-up times around sleep cycles</title>
+<style>
+/* ============================================================
+   Tokens
+   ============================================================ */
+:root{
+  color-scheme: dark;
+  --bg: #0A1122;
+  --bg-raise: #0E1629;
+  --surface: #121B31;
+  --surface-2: #17213B;
+  --surface-3: #1C2745;
+  --line: #263252;
+  --line-soft: rgba(151,167,214,.13);
+  --text: #E9EEFA;
+  --text-2: #A3AEC9;
+  --text-3: #7C88A6;
+  --accent: #6C9BFF;
+  --accent-strong: #3B6BE0;
+  --accent-strong-hover: #4576EC;
+  --accent-soft: rgba(108,155,255,.13);
+  --accent-line: rgba(108,155,255,.45);
+  --violet: #9C8CFF;
+  --violet-soft: rgba(156,140,255,.15);
+  --good: #57C9A6;
+  --good-soft: rgba(87,201,166,.15);
+  --warn: #E4AE62;
+  --warn-soft: rgba(228,174,98,.14);
+  --r-card: 16px;
+  --r-big: 20px;
+  --r-ctl: 10px;
+  --r-in: 12px;
+  --ease: cubic-bezier(.2,.6,.2,1);
+  --t-fast: 140ms;
+  --t-med: 220ms;
+  --wrap: 1120px;
+  --shadow: 0 16px 40px rgba(4,8,18,.5);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+*{ box-sizing: border-box; }
+html{ -webkit-text-size-adjust: 100%; }
+body{
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+/* One sparing, tonal wash: night sky over the page */
+body::before{
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(1100px 520px at 50% -140px, rgba(46,76,154,.24), rgba(46,76,154,0) 70%);
+}
+body, .site-header, .panel, .settings summary, .tray{ background-clip: padding-box; }
+main{ position: relative; }
+h1, h2, h3{ margin: 0; font-weight: 600; line-height: 1.25; }
+p{ margin: 0; }
+button{ font: inherit; }
+::selection{ background: rgba(108,155,255,.32); }
+:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+.sr-only{
+  position: absolute; width: 1px; height: 1px; margin: -1px;
+  padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.skip-link{
+  position: absolute; left: 16px; top: -48px; z-index: 60;
+  background: var(--surface-2); color: var(--text); text-decoration: none;
+  padding: 8px 14px; border-radius: var(--r-ctl); font-size: 14px; font-weight: 600;
+  transition: top var(--t-fast) var(--ease);
+}
+.skip-link:focus{ top: 12px; }
+.wrap{ max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
+.tnum{ font-variant-numeric: tabular-nums; }
+.ic{ flex: none; display: block; }
+
+/* One entrance on load: a short fade and rise, small stagger */
+.rise{ opacity: 1; transform: none; transition: opacity 420ms var(--ease), transform 420ms var(--ease); }
+body.preload .rise{ opacity: 0; transform: translateY(10px); }
+body.preload .site-header .rise{ transition-delay: 0ms; }
+body.preload .planner{ transition-delay: 70ms; }
+body.preload .results{ transition-delay: 140ms; }
+body.preload .learn{ transition-delay: 210ms; }
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.btn{
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 14px; font-weight: 600; line-height: 1;
+  border-radius: var(--r-ctl); border: 1px solid transparent;
+  cursor: pointer; white-space: nowrap;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.btn:active{ transform: scale(.98); }
+.btn-ghost{
+  background: transparent; border-color: var(--line); color: var(--text-2);
+  padding: 11px 14px;
+}
+.btn-ghost:hover{ background: var(--surface-2); color: var(--text); }
+.btn-ghost.is-on{ background: var(--accent-strong); border-color: transparent; color: #fff; }
+.btn-primary{
+  background: var(--accent-strong); color: #fff; padding: 12px 18px;
+}
+.btn-primary:hover{ background: var(--accent-strong-hover); }
+.btn-primary:disabled{ opacity: .45; cursor: default; transform: none; }
+.btn-sm{ padding: 8px 12px; font-size: 13px; }
+.icon-btn{
+  width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: none; border-radius: var(--r-ctl);
+  color: var(--text-3); cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.icon-btn:hover{ background: var(--surface-2); color: var(--text-2); }
+.icon-btn:active{ transform: scale(.96); }
+.icon-btn.is-on{ background: var(--accent-soft); color: var(--accent); }
+
+/* ============================================================
+   Header
+   ============================================================ */
+.site-header{
+  position: relative; z-index: 10;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--bg);
+}
+.header-inner{
+  height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.brand{ display: inline-flex; align-items: center; gap: 10px; color: var(--accent); }
+.brand-name{ font-size: 16px; font-weight: 600; color: var(--text); letter-spacing: .01em; }
+.brand-name span{ font-weight: 500; color: var(--text-2); }
+.now{ display: inline-flex; align-items: baseline; gap: 8px; font-size: 13.5px; color: var(--text-3); }
+.now time{ font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   Planner
+   ============================================================ */
+.planner{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  padding: 48px 0 8px;
+}
+.intro h1{ font-size: 34px; letter-spacing: -.01em; max-width: 21ch; }
+.lede{ margin-top: 16px; color: var(--text-2); font-size: 15.5px; max-width: 54ch; }
+.lede-note{
+  margin-top: 14px; display: flex; gap: 8px; align-items: flex-start;
+  color: var(--text-3); font-size: 13.5px; max-width: 52ch;
+}
+.lede-note .ic{ margin-top: 3px; color: var(--text-3); }
+
+.panel{
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-card);
+  padding: 24px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+
+/* Segmented controls */
+.seg{
+  display: flex; gap: 4px; padding: 4px;
+  background: var(--bg-raise); border: 1px solid var(--line-soft); border-radius: var(--r-ctl);
+}
+.seg > label{
+  flex: 1 1 0; text-align: center;
+  padding: 11px 12px; border-radius: 8px;
+  font-size: 14.5px; font-weight: 500; color: var(--text-2);
+  cursor: pointer; user-select: none;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.seg > label:hover{ color: var(--text); }
+.seg input:checked + label{ background: var(--surface-3); color: var(--text); font-weight: 600; }
+.seg input:focus-visible + label{ outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg--sm > label{ padding: 8px 10px; font-size: 13.5px; }
+
+/* Time input */
+.time-group{ display: flex; flex-direction: column; gap: 8px; }
+.time-label{ font-size: 13.5px; font-weight: 500; color: var(--text-2); }
+.time-field{
+  display: flex; align-items: center; gap: 4px;
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r-in);
+  padding: 10px 16px;
+  min-height: 76px;
+  transition: border-color var(--t-fast) var(--ease);
+}
+.time-field:focus-within{ border-color: var(--accent); outline: 2px solid rgba(108,155,255,.35); outline-offset: 1px; }
+.t-in{
+  width: 2.3ch; padding: 0; border: none; background: none;
+  color: var(--text); font-family: inherit; font-size: 44px; font-weight: 600;
+  font-variant-numeric: tabular-nums; text-align: center;
+  transition: none;
+}
+.t-in:focus{ outline: none; }
+.t-in::placeholder{ color: var(--text-3); }
+.t-sep{ font-size: 34px; font-weight: 400; color: var(--text-3); padding: 0 2px; }
+.mer-group{ display: flex; gap: 4px; margin-left: 10px; padding: 4px; background: var(--surface); border-radius: 8px; }
+.mer-btn{
+  min-width: 50px; height: 44px; padding: 0 10px;
+  background: transparent; border: none; border-radius: 6px;
+  color: var(--text-3); font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.mer-btn:hover{ color: var(--text-2); }
+.mer-btn[aria-pressed="true"]{ background: var(--surface-3); color: var(--text); }
+
+.time-foot{ display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; flex-wrap: wrap; }
+.field-error{ color: var(--warn); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.field-error[hidden]{ display: none; }
+
+/* Quick picks */
+.presets{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.presets-label{ font-size: 13px; color: var(--text-3); margin-right: 4px; }
+
+/* Settings */
+.settings{
+  border: 1px solid var(--line-soft); border-radius: var(--r-in);
+  background: var(--bg-raise);
+}
+.settings summary{
+  list-style: none; cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px;
+  font-size: 13.5px; color: var(--text-2);
+  border-radius: var(--r-in);
+}
+.settings summary::-webkit-details-marker{ display: none; }
+.settings summary:hover{ color: var(--text); }
+.settings summary .sum-title{ font-weight: 600; color: var(--text); }
+.settings summary .sum-vals{ color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings .chev{
+  margin-left: auto; color: var(--text-3);
+  transition: transform var(--t-med) var(--ease);
+}
+.settings[open] .chev{ transform: rotate(90deg); }
+.settings-body{
+  padding: 4px 16px 18px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 18px 16px;
+}
+.field{ display: flex; flex-direction: column; gap: 7px; }
+.f-label{ font-size: 13.5px; font-weight: 500; color: var(--text-2); }
+.num-wrap{ position: relative; display: flex; align-items: center; }
+.num-wrap input{
+  width: 100%; height: 44px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-ctl);
+  color: var(--text); font: inherit; font-size: 15px; font-variant-numeric: tabular-nums;
+  padding: 0 44px 0 12px;
+  transition: border-color var(--t-fast) var(--ease);
+}
+.num-wrap input:focus{ outline: none; border-color: var(--accent); }
+.num-wrap input:focus-visible{ outline: 2px solid rgba(108,155,255,.35); outline-offset: 1px; }
+.num-wrap input[type=number]::-webkit-outer-spin-button,
+.num-wrap input[type=number]::-webkit-inner-spin-button{ -webkit-appearance: none; margin: 0; }
+.num-wrap input[type=number]{ -moz-appearance: textfield; appearance: textfield; }
+.unit{ position: absolute; right: 12px; font-size: 13px; color: var(--text-3); pointer-events: none; }
+.hint{ font-size: 12.5px; color: var(--text-3); }
+select{
+  width: 100%; height: 44px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-ctl);
+  color: var(--text); font: inherit; font-size: 14.5px; padding: 0 12px;
+  transition: border-color var(--t-fast) var(--ease);
+}
+select:focus{ outline: none; border-color: var(--accent); }
+select:focus-visible{ outline: 2px solid rgba(108,155,255,.35); outline-offset: 1px; }
+.settings-note{
+  grid-column: 1 / -1;
+  font-size: 12.5px; color: var(--text-3);
+  border-top: 1px solid var(--line-soft); padding-top: 14px;
+}
+
+/* ============================================================
+   Results
+   ============================================================ */
+.results{ padding: 40px 0 8px; }
+.results-head{ margin-bottom: 20px; }
+.results-head h2{ font-size: 22px; }
+.results-sub{ margin-top: 6px; font-size: 14px; color: var(--text-2); }
+.results-note{
+  margin-top: 20px; display: flex; gap: 8px; align-items: flex-start;
+  font-size: 13px; color: var(--text-3); max-width: 78ch;
+}
+.results-note .ic{ margin-top: 3px; flex: none; }
+
+.card{
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-card);
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease);
+}
+.card:hover{ border-color: #33406b; }
+.card.is-fav{ border-color: var(--accent-line); }
+.card-featured{
+  background: var(--surface-2);
+  border-color: rgba(108,155,255,.34);
+  border-radius: var(--r-big);
+  padding: 26px;
+  gap: 20px;
+}
+.card-featured.is-fav{ border-color: var(--accent); }
+
+.card-top{ display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.badges{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.badge{
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 600; line-height: 1;
+  padding: 6px 10px; border-radius: 999px;
+}
+.badge--best{ background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px rgba(108,155,255,.35); }
+.badge--rec{ background: var(--good-soft); color: var(--good); }
+.badge--less{ background: var(--warn-soft); color: var(--warn); }
+.badge--more{ background: var(--violet-soft); color: var(--violet); }
+.pick-chip{
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  background: var(--accent-soft); border-radius: 999px; padding: 5px 9px;
+}
+.actions{ display: flex; align-items: center; gap: 6px; }
+
+.time-block{ display: flex; flex-direction: column; gap: 4px; }
+.time-block .t-label{ font-size: 13px; font-weight: 500; color: var(--text-3); }
+.time-big{
+  font-size: 34px; font-weight: 600; letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.time-big .mer{ font-size: .55em; font-weight: 600; color: var(--text-2); margin-left: 4px; }
+.card-featured .time-big{ font-size: 46px; }
+.card-featured .time-big .mer{ color: var(--text-2); }
+.t-day{ font-size: 13px; color: var(--text-3); }
+.card-note{ font-size: 13px; color: var(--text-2); max-width: 40ch; }
+
+.stats{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+.stat{ display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stat-label{ font-size: 12.5px; color: var(--text-3); }
+.stat-value{ font-size: 15.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-day{ font-size: 12px; color: var(--text-3); font-weight: 400; margin-left: 6px; }
+
+/* Cycle beads — the signature */
+.timeline{ position: relative; display: flex; align-items: center; height: 40px; padding: 0 7px; margin: 0 -7px; }
+.timeline--lg{ height: 56px; }
+.tl-seg{ position: relative; height: 100%; }
+.tl-seg::before{
+  content: ""; position: absolute; left: 0; right: 0; top: 50%;
+  border-top: 2px solid rgba(108,155,255,.32);
+}
+.tl-seg--lead::before{ border-top: 2px dashed var(--text-3); opacity: .8; }
+.tl-dot{
+  position: absolute; top: 50%; left: 50%;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--surface-2);
+  transform: translate(-50%, -50%);
+}
+.card-featured .tl-dot{ width: 12px; height: 12px; }
+.tl-dot--start{ left: 0; background: var(--surface-2); border: 2.5px solid var(--accent); }
+.tl-dot--end{ left: 100%; width: 12px; height: 12px; background: var(--violet); }
+.card-featured .tl-dot--end{ width: 14px; height: 14px; }
+.tl-labels{
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 12.5px; color: var(--text-3); font-variant-numeric: tabular-nums;
+}
+
+/* Duration meter */
+.meter{ display: flex; flex-direction: column; gap: 8px; }
+.meter-track{
+  position: relative; height: 8px; border-radius: 4px;
+  background: var(--bg-raise); border: 1px solid var(--line-soft);
+}
+.meter-band{
+  position: absolute; top: -1px; bottom: -1px;
+  background: rgba(87,201,166,.22);
+  border-left: 1px solid rgba(87,201,166,.55);
+  border-right: 1px solid rgba(87,201,166,.55);
+  border-radius: 4px;
+}
+.meter-mark{
+  position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 2.5px solid var(--surface-2);
+  background: var(--good);
+}
+.meter-mark.is-below{ background: var(--warn); }
+.meter-mark.is-above{ background: var(--violet); }
+.meter-foot{ display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+.meter-status{ font-weight: 600; }
+.meter-status.is-in{ color: var(--good); }
+.meter-status.is-below{ color: var(--warn); }
+.meter-status.is-above{ color: var(--violet); }
+.meter-range{ color: var(--text-3); }
+
+.card-grid{
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px; margin-top: 16px;
+}
+
+/* Card internals: featured splits time | data, compact stacks */
+.card-body{ display: flex; flex-direction: column; gap: 16px; }
+.feat-grid{ display: flex; flex-direction: column; gap: 20px; }
+.feat-data{ display: flex; flex-direction: column; gap: 16px; }
+@media (min-width: 900px){
+  .feat-grid{
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+}
+
+/* Empty state */
+.empty{
+  border: 1px dashed var(--line); border-radius: var(--r-card);
+  padding: 56px 24px; text-align: center; color: var(--text-2);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.empty .ic{ color: var(--text-3); }
+.empty p{ font-size: 14.5px; max-width: 44ch; }
+
+/* ============================================================
+   Learn
+   ============================================================ */
+.learn{ padding: 48px 0 8px; }
+.learn h2{ font-size: 20px; margin-bottom: 18px; }
+.learn-grid{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.learn-card{
+  border: 1px solid var(--line-soft); border-radius: var(--r-card);
+  padding: 20px 22px;
+}
+.learn-card h3{ font-size: 15px; margin-bottom: 8px; }
+.learn-card p{ font-size: 14px; color: var(--text-2); }
+
+/* ============================================================
+   Footer
+   ============================================================ */
+.site-footer{
+  margin-top: 56px; border-top: 1px solid var(--line-soft);
+  padding: 28px 0 40px;
+}
+.footer-inner{ display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; font-size: 13px; color: var(--text-3); }
+
+/* ============================================================
+   Compare tray + modal
+   ============================================================ */
+.tray{
+  position: fixed; left: 50%; bottom: 20px; z-index: 40;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 14px; padding: 10px 10px 10px 18px;
+  box-shadow: var(--shadow);
+  transform: translate(-50%, 0);
+  opacity: 1; visibility: visible;
+  transition: opacity var(--t-med) var(--ease), transform var(--t-med) var(--ease), visibility 0s linear 0s;
+}
+.tray.is-hidden{
+  opacity: 0; visibility: hidden; transform: translate(-50%, 8px);
+  transition: opacity var(--t-med) var(--ease), transform var(--t-med) var(--ease), visibility 0s linear var(--t-med);
+  pointer-events: none;
+}
+.tray-text{ font-size: 13.5px; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+body.tray-open{ padding-bottom: 88px; }
+
+.modal-root{ position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.modal-root.is-hidden{ display: none; }
+.modal-backdrop{
+  position: absolute; inset: 0; background: rgba(5,9,20,.66);
+  opacity: 1; transition: opacity var(--t-med) var(--ease);
+}
+.modal-root.is-hidden .modal-backdrop{ opacity: 0; }
+.modal-card{
+  position: relative; width: min(880px, 100%); max-height: 86vh; overflow: auto;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-big); padding: 24px;
+  box-shadow: var(--shadow);
+  transform: translateY(0); opacity: 1;
+  transition: transform var(--t-med) var(--ease), opacity var(--t-med) var(--ease);
+}
+.modal-root.is-hidden .modal-card{ transform: translateY(8px); opacity: 0; }
+.modal-head{ display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.modal-head h2{ font-size: 18px; }
+.cmp-scroll{ overflow-x: auto; }
+.cmp-table{ width: 100%; min-width: 620px; border-collapse: collapse; font-size: 14px; }
+.cmp-table th, .cmp-table td{
+  padding: 12px 14px; text-align: left; vertical-align: top;
+  border-bottom: 1px solid var(--line-soft);
+}
+.cmp-table thead th{ background: var(--surface-2); font-size: 13.5px; font-weight: 600; }
+.cmp-table thead th .cell-day{ font-weight: 500; }
+.cmp-table tbody th{
+  position: sticky; left: 0; z-index: 1;
+  background: var(--surface); color: var(--text-2);
+  font-size: 13px; font-weight: 500; white-space: nowrap;
+}
+.cmp-table thead th:first-child{ background: var(--surface-2); z-index: 2; }
+.cmp-table .col-fav{ background: var(--accent-soft); }
+.cmp-table td{ font-variant-numeric: tabular-nums; }
+.cell-time{ font-weight: 600; }
+.cell-day{ display: block; font-size: 12px; color: var(--text-3); font-weight: 400; margin-top: 2px; }
+.status-in{ color: var(--good); font-weight: 600; }
+.status-below{ color: var(--warn); font-weight: 600; }
+.status-above{ color: var(--violet); font-weight: 600; }
+
+noscript .ns{
+  display: block; margin: 32px auto; max-width: 560px;
+  border: 1px solid var(--warn); background: var(--warn-soft);
+  color: var(--text); border-radius: var(--r-card); padding: 16px 20px;
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (min-width: 960px){
+  .planner{ grid-template-columns: .95fr 1.05fr; gap: 48px; align-items: start; padding-top: 56px; }
+  .intro h1{ font-size: 40px; }
+}
+@media (max-width: 1023px){
+  .card-grid{ grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 719px){
+  .wrap{ padding: 0 20px; }
+  .learn-grid{ grid-template-columns: 1fr; }
+}
+@media (max-width: 619px){
+  .card-grid{ grid-template-columns: 1fr; }
+  .planner{ padding-top: 36px; gap: 24px; }
+  .intro h1{ font-size: 28px; }
+  .panel{ padding: 20px; }
+  .t-in{ font-size: 38px; }
+  .time-field{ min-height: 68px; padding: 8px 14px; }
+  .card-featured{ padding: 20px; }
+  .card-featured .time-big{ font-size: 38px; }
+  .results{ padding-top: 32px; }
+  .seg > label{ font-size: 13.5px; padding: 10px 8px; }
+  .mer-btn{ min-width: 44px; }
+  .tray{ left: 16px; right: 16px; transform: none; justify-content: space-between; }
+  .tray.is-hidden{ transform: translateY(8px); }
+  .modal-root{ padding: 12px; }
+}
+@media (max-width: 389px){
+  .t-in{ font-size: 32px; }
+  .mer-group{ margin-left: 6px; padding: 3px; }
+  .mer-btn{ min-width: 40px; height: 40px; padding: 0 6px; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ transition: none !important; animation: none !important; }
+  body.preload .rise{ opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body class="preload">
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="site-header">
+  <div class="wrap header-inner rise">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+      </svg>
+      <span class="brand-name">Sleep Cycle <span>Calculator</span></span>
+    </div>
+    <div class="now">
+      <span class="now-label">Now</span>
+      <time id="nowClock">—</time>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <noscript><span class="ns">This calculator needs JavaScript to work. Please enable it to see sleep-cycle options.</span></noscript>
+
+  <section class="planner rise" aria-labelledby="plannerTitle">
+    <div class="intro">
+      <h1 id="plannerTitle">Pick one time. Get four ways to plan the night.</h1>
+      <p class="lede" id="lede"></p>
+      <p class="lede-note">
+        <svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><path d="M12 7.6v.1"></path>
+        </svg>
+        <span>These are planning estimates, not measurements of your actual sleep.</span>
+      </p>
+    </div>
+
+    <form class="panel" id="plannerForm" novalidate>
+      <div class="seg" role="radiogroup" aria-label="Which time do you know?">
+        <input type="radio" name="mode" id="modeWake" value="wake" checked class="sr-only">
+        <label for="modeWake">I want to wake up at</label>
+        <input type="radio" name="mode" id="modeSleep" value="sleep" class="sr-only">
+        <label for="modeSleep">I want to sleep at</label>
+      </div>
+
+      <div class="time-group">
+        <label class="time-label" for="hh" id="timeLabel">Wake up at</label>
+        <div class="time-field" role="group" aria-labelledby="timeLabel">
+          <input class="t-in tnum" id="hh" type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Hours">
+          <span class="t-sep" aria-hidden="true">:</span>
+          <input class="t-in tnum" id="mm" type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Minutes">
+          <div class="mer-group" id="merGroup" role="group" aria-label="AM or PM">
+            <button type="button" class="mer-btn" id="merAM" data-mer="AM" aria-pressed="true">AM</button>
+            <button type="button" class="mer-btn" id="merPM" data-mer="PM" aria-pressed="false">PM</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="time-foot">
+        <p class="field-error" id="timeError" role="alert" hidden>
+          <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 4.5L2.8 20h18.4z"></path><path d="M12 10v4.4"></path><path d="M12 17.4v.1"></path>
+          </svg>
+          <span id="timeErrorText"></span>
+        </p>
+        <button type="button" class="btn btn-ghost btn-sm" id="nowBtn" style="margin-left:auto">
+          <svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"></circle><path d="M12 7.5V12l3 1.8"></path>
+          </svg>
+          Use current time
+        </button>
+      </div>
+
+      <div class="presets" role="group" aria-label="Quick suggestions">
+        <span class="presets-label">Quick picks</span>
+        <button type="button" class="btn btn-ghost btn-sm preset" data-preset="early" aria-pressed="false">Wake up early</button>
+        <button type="button" class="btn btn-ghost btn-sm preset" data-preset="school" aria-pressed="false">Standard school day</button>
+        <button type="button" class="btn btn-ghost btn-sm preset" data-preset="weekend" aria-pressed="false">Weekend schedule</button>
+      </div>
+
+      <details class="settings" id="settings">
+        <summary>
+          <span class="sum-title">Sleep settings</span>
+          <span class="sum-vals" id="settingsSummary"></span>
+          <svg class="ic chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 6l6 6-6 6"></path>
+          </svg>
+        </summary>
+        <div class="settings-body">
+          <div class="field">
+            <label class="f-label" for="inFall">Time to fall asleep</label>
+            <div class="num-wrap">
+              <input id="inFall" type="number" min="0" max="90" step="1" value="15" aria-describedby="hintFall">
+              <span class="unit">min</span>
+            </div>
+            <p class="hint" id="hintFall">0 to 90 minutes · default 15</p>
+          </div>
+          <div class="field">
+            <label class="f-label" for="inCycle">Length of one sleep cycle</label>
+            <div class="num-wrap">
+              <input id="inCycle" type="number" min="60" max="120" step="1" value="90" aria-describedby="hintCycle">
+              <span class="unit">min</span>
+            </div>
+            <p class="hint" id="hintCycle">60 to 120 minutes · default 90</p>
+          </div>
+          <div class="field">
+            <label class="f-label" for="ageSel">Age group</label>
+            <select id="ageSel">
+              <option value="child">Children 6–12</option>
+              <option value="teen" selected>Teens 13–17</option>
+              <option value="adult">Adults 18–64</option>
+              <option value="senior">Older adults 65+</option>
+            </select>
+            <p class="hint" id="ageHint">Recommended 8–10 hours a night</p>
+          </div>
+          <div class="field">
+            <span class="f-label" id="clockLabel">Clock format</span>
+            <div class="seg seg--sm" role="radiogroup" aria-labelledby="clockLabel">
+              <input type="radio" name="clock" id="clock12" value="12" checked class="sr-only">
+              <label for="clock12">12-hour</label>
+              <input type="radio" name="clock" id="clock24" value="24" class="sr-only">
+              <label for="clock24">24-hour</label>
+            </div>
+            <p class="hint">Applies to every time shown</p>
+          </div>
+          <p class="settings-note">These settings shape estimates only — they do not measure your actual sleep.</p>
+        </div>
+      </details>
+    </form>
+  </section>
+
+  <section class="results rise" id="results" aria-labelledby="resultsTitle">
+    <div class="results-head">
+      <h2 id="resultsTitle">Results</h2>
+      <p class="results-sub" id="resultsSub" aria-live="polite"></p>
+    </div>
+    <div id="resultsBody"></div>
+    <p class="results-note">
+      <svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><path d="M12 7.6v.1"></path>
+      </svg>
+      <span>Ninety minutes is a planning average, not a scientific constant. Real sleep cycles vary between people and across the night, and this tool cannot measure your actual sleep.</span>
+    </p>
+  </section>
+
+  <section class="learn rise" aria-labelledby="learnTitle">
+    <h2 id="learnTitle">How the numbers work</h2>
+    <div class="learn-grid">
+      <article class="learn-card">
+        <h3>Sleep happens in rounds</h3>
+        <p>Night sleep repeats in cycles of light sleep, deep sleep and REM. Deep sleep dominates the first half of the night, while REM periods grow longer toward morning. Most people move through four to six rounds, and teenagers typically need more time in bed than adults.</p>
+      </article>
+      <article class="learn-card">
+        <h3>Why duration matters</h3>
+        <p>For ages 13–17 the recommended range is 8–10 hours a night. Regular timing matters too, but nights that consistently land short are associated with worse attention, mood and memory the following day.</p>
+      </article>
+      <article class="learn-card">
+        <h3>Why cycles vary</h3>
+        <p>Ninety minutes is an average used for planning. Real cycles run roughly 70 to 120 minutes, differ from person to person, and change during a single night — earlier rounds run longer, later ones shorter.</p>
+      </article>
+      <article class="learn-card">
+        <h3>Why a cycle boundary is not a guarantee</h3>
+        <p>Waking up right at the end of an estimated cycle is a planning idea, not a switch. Sleep inertia, your individual rhythm, stress, light and overall sleep debt all shape how refreshed a wake-up actually feels.</p>
+      </article>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <span>Sleep Cycle Calculator — estimates only. Cycles vary between people and across the night.</span>
+    <span>Nothing you enter leaves this page.</span>
+  </div>
+</footer>
+
+<div class="tray is-hidden" id="tray" aria-hidden="true">
+  <span class="tray-text" id="trayText"></span>
+  <button type="button" class="btn btn-ghost btn-sm" id="trayClear">Clear</button>
+  <button type="button" class="btn btn-primary btn-sm" id="trayCompare">Compare</button>
+</div>
+
+<div class="modal-root is-hidden" id="modalRoot" aria-hidden="true">
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle" id="modalCard">
+    <div class="modal-head">
+      <h2 id="modalTitle">Compare options</h2>
+      <button type="button" class="icon-btn" id="modalClose" aria-label="Close comparison">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12"></path><path d="M18 6L6 18"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ==== ENGINE START ==== */
+/* Pure calculation and formatting engine — no DOM access here. */
+var SleepEngine = (function(){
+  var CYCLES = [4, 5, 6, 7];
+  var DAY_MIN = 1440;
+
+  var AGE_GROUPS = {
+    child:  { label: 'Children 6–12',   min: 9, max: 12, hint: 'Recommended 9–12 hours a night' },
+    teen:   { label: 'Teens 13–17',     min: 8, max: 10, hint: 'Recommended 8–10 hours a night' },
+    adult:  { label: 'Adults 18–64',    min: 7, max: 9,  hint: 'Recommended 7–9 hours a night' },
+    senior: { label: 'Older adults 65+', min: 7, max: 8, hint: 'Recommended 7–8 hours a night' }
+  };
+
+  function pad(n){ return String(n).padStart(2, '0'); }
+
+  /* Parse field text into a valid {h24, m} or an error. */
+  function parseTime(hhStr, mmStr, clock12, mer){
+    var hh = String(hhStr == null ? '' : hhStr).trim();
+    var mm = String(mmStr == null ? '' : mmStr).trim();
+    if (hh === '' || mm === '') return { ok: false, error: 'Enter both hours and minutes' };
+    if (!/^\d{1,2}$/.test(hh)) return { ok: false, error: clock12 ? 'Hours must be between 1 and 12' : 'Hours must be between 0 and 23' };
+    if (!/^\d{1,2}$/.test(mm)) return { ok: false, error: 'Minutes must be between 0 and 59' };
+    var h = parseInt(hh, 10), m = parseInt(mm, 10);
+    if (m > 59) return { ok: false, error: 'Minutes must be between 0 and 59' };
+    if (clock12){
+      if (h > 12) return { ok: false, error: 'Hours must be between 1 and 12' };
+      if (mer !== 'AM' && mer !== 'PM') return { ok: false, error: 'Choose AM or PM' };
+      h = (h % 12) + (mer === 'PM' ? 12 : 0);
+    } else {
+      if (h > 23) return { ok: false, error: 'Hours must be between 0 and 23' };
+    }
+    return { ok: true, h24: h, m: m };
+  }
+
+  /* Next occurrence of a clock time, at or after `now` (second resolution). */
+  function nextOccurrence(now, h24, m){
+    var start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h24, m, 0, 0);
+    var nowFloor = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0);
+    if (start.getTime() < nowFloor.getTime()) start.setDate(start.getDate() + 1);
+    return start;
+  }
+
+  /* Wrap absolute minutes into a day, returning {min, shift}. */
+  function normalize(abs){
+    var shift = 0;
+    while (abs < 0){ abs += DAY_MIN; shift--; }
+    while (abs >= DAY_MIN){ abs -= DAY_MIN; shift++; }
+    return { min: abs, shift: shift };
+  }
+
+  /* Calendar date for a day offset from a base date, built at noon (DST-safe). */
+  function shiftDate(base, days){
+    return new Date(base.getFullYear(), base.getMonth(), base.getDate() + days, 12, 0, 0, 0);
+  }
+
+  function fmtTime(min, clock12){
+    var h = Math.floor(min / 60) % 24;
+    var m = min % 60;
+    if (clock12){
+      var mer = h < 12 ? 'AM' : 'PM';
+      var h12 = h % 12 || 12;
+      return { main: h12 + ':' + pad(m), mer: mer, text: h12 + ':' + pad(m) + ' ' + mer };
+    }
+    return { main: pad(h) + ':' + pad(m), mer: '', text: pad(h) + ':' + pad(m) };
+  }
+
+  function fmtDur(min){
+    return Math.floor(min / 60) + 'h ' + pad(min % 60) + 'm';
+  }
+
+  function dayDiff(a, b){
+    var ua = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+    var ub = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+    return Math.round((ua - ub) / 86400000);
+  }
+
+  function relativeDay(date, now){
+    var diff = dayDiff(date, now);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Tomorrow';
+    if (diff === -1) return 'Yesterday';
+    return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
+  }
+
+  function dayShort(date){
+    return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
+  }
+
+  /* Core: all four cycle options, dated, for either mode. */
+  function compute(now, h24, m, mode, cfg){
+    /* cfg: { fallMin, cycleMin, recMinH, recMaxH } */
+    var anchor = nextOccurrence(now, h24, m);
+    var anchorDay = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate(), 12, 0, 0, 0);
+    var anchorMin = h24 * 60 + m;
+    var recMin = cfg.recMinH * 60;
+    var recMax = cfg.recMaxH * 60;
+    var target = (recMin + recMax) / 2;
+    var range = recMax - recMin;
+    var options = [];
+
+    for (var i = 0; i < CYCLES.length; i++){
+      var c = CYCLES[i];
+      var sleepMin = c * cfg.cycleMin;
+      if (sleepMin + cfg.fallMin > 16 * 60) continue;
+
+      var bedAbs, fallAbs, wakeAbs;
+      if (mode === 'wake'){
+        /* anchor is the wake-up time */
+        wakeAbs = anchorMin;
+        fallAbs = anchorMin - sleepMin;
+        bedAbs = fallAbs - cfg.fallMin;
+      } else {
+        /* anchor is the bedtime */
+        bedAbs = anchorMin;
+        fallAbs = anchorMin + cfg.fallMin;
+        wakeAbs = fallAbs + sleepMin;
+      }
+      var bed = normalize(bedAbs), fall = normalize(fallAbs), wake = normalize(wakeAbs);
+
+      var durationMin = sleepMin;
+      var status = durationMin < recMin ? 'below' : (durationMin <= recMax ? 'in' : 'above');
+      var gap;
+      if (status === 'in') gap = Math.abs(durationMin - target);
+      else if (status === 'below') gap = range + (recMin - durationMin);
+      else gap = range + (durationMin - recMax);
+
+      options.push({
+        cycles: c,
+        sleepMin: durationMin,
+        status: status,
+        score: gap,
+        distTarget: Math.abs(durationMin - target),
+        isBest: false,
+        bed:    { min: bed.min,  date: shiftDate(anchorDay, bed.shift) },
+        fall:   { min: fall.min, date: shiftDate(anchorDay, fall.shift) },
+        wake:   { min: wake.min, date: shiftDate(anchorDay, wake.shift) }
+      });
+    }
+
+    /* Rank: in-range beats out-of-range, then closeness to the target
+       duration, then shorter duration. Never promote short sleep. */
+    options.sort(function(a, b){
+      if (a.score !== b.score) return a.score - b.score;
+      if (a.distTarget !== b.distTarget) return a.distTarget - b.distTarget;
+      return a.sleepMin - b.sleepMin;
+    });
+    if (options.length) options[0].isBest = true;
+
+    return {
+      anchor: { date: anchor, min: anchorMin },
+      options: options,
+      rec: { minH: cfg.recMinH, maxH: cfg.recMaxH, targetH: target / 60 }
+    };
+  }
+
+  return {
+    CYCLES: CYCLES,
+    AGE_GROUPS: AGE_GROUPS,
+    parseTime: parseTime,
+    nextOccurrence: nextOccurrence,
+    compute: compute,
+    fmtTime: fmtTime,
+    fmtDur: fmtDur,
+    relativeDay: relativeDay,
+    dayShort: dayShort
+  };
+})();
+/* ==== ENGINE END ==== */
+
+/* ============================================================
+   State
+   ============================================================ */
+var STORE_SETTINGS = 'scc.settings.v1';
+var STORE_FAV = 'scc.fav.v1';
+
+var state = {
+  mode: 'wake',              /* 'wake' | 'sleep' */
+  time: { h24: 7, m: 0 },    /* last valid time */
+  valid: true,
+  fall: 15,
+  cycle: 90,
+  age: 'teen',
+  clock12: true,
+  favourite: null,           /* cycle count of the chosen option */
+  compare: new Set(),
+  preset: null,
+  results: null
+};
+
+var PRESETS = {
+  early:   { mode: 'wake',  h: 5,  m: 30, label: 'Wake up early' },
+  school:  { mode: 'wake',  h: 6,  m: 45, label: 'Standard school day' },
+  weekend: { mode: 'sleep', h: 23, m: 45, label: 'Weekend schedule' }
+};
+
+var $ = function(sel){ return document.querySelector(sel); };
+
+function loadPrefs(){
+  try {
+    var s = JSON.parse(localStorage.getItem(STORE_SETTINGS) || 'null');
+    if (s && typeof s === 'object'){
+      if (Number.isFinite(s.fall) && s.fall >= 0 && s.fall <= 90) state.fall = s.fall;
+      if (Number.isFinite(s.cycle) && s.cycle >= 60 && s.cycle <= 120) state.cycle = s.cycle;
+      if (s.age && SleepEngine.AGE_GROUPS[s.age]) state.age = s.age;
+      if (typeof s.clock12 === 'boolean') state.clock12 = s.clock12;
+    }
+    var f = JSON.parse(localStorage.getItem(STORE_FAV) || 'null');
+    if (f === 4 || f === 5 || f === 6 || f === 7) state.favourite = f;
+  } catch (e){ /* storage unavailable — keep defaults */ }
+}
+function savePrefs(){
+  try {
+    localStorage.setItem(STORE_SETTINGS, JSON.stringify({ fall: state.fall, cycle: state.cycle, age: state.age, clock12: state.clock12 }));
+    localStorage.setItem(STORE_FAV, JSON.stringify(state.favourite));
+  } catch (e){ /* ignore */ }
+}
+
+function rec(){ return SleepEngine.AGE_GROUPS[state.age]; }
+
+/* ============================================================
+   Small helpers
+   ============================================================ */
+function fmtT(min){ return SleepEngine.fmtTime(min, state.clock12); }
+function dayLabel(date){ return SleepEngine.relativeDay(date, new Date()); }
+
+var ICONS = {
+  star: '<path d="M12 3.6l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L5.5 9.8l5.9-.9z"></path>',
+  check: '<path d="M4.5 12.5l4.5 4.5 10-10"></path>',
+  warn: '<path d="M12 4.5L2.8 20h18.4z"></path><path d="M12 10v4.4"></path><path d="M12 17.4v.1"></path>',
+  plus: '<path d="M12 5.5v13"></path><path d="M5.5 12h13"></path>'
+};
+function svgIcon(name, size, filled){
+  return '<svg class="ic" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="' + (filled ? 'currentColor' : 'none') +
+    '" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
+}
+
+var BADGES = {
+  best: { cls: 'badge--best', label: 'Best recommendation', icon: 'star' },
+  rec:  { cls: 'badge--rec',  label: 'Recommended',          icon: 'check' },
+  less: { cls: 'badge--less', label: 'Less than recommended', icon: 'warn' },
+  more: { cls: 'badge--more', label: 'More than recommended', icon: 'plus' }
+};
+function badgeKind(opt){
+  if (opt.isBest) return 'best';
+  if (opt.status === 'in') return 'rec';
+  if (opt.status === 'below') return 'less';
+  return 'more';
+}
+function badgeHTML(kind){
+  var b = BADGES[kind];
+  return '<span class="badge ' + b.cls + '">' + svgIcon(b.icon, 13, b.icon === 'star') + '<span>' + b.label + '</span></span>';
+}
+function statusText(opt){
+  var r = rec();
+  if (opt.status === 'in') return 'Within ' + r.min + '–' + r.max + ' h';
+  if (opt.status === 'below') return 'Below ' + r.min + '–' + r.max + ' h';
+  return 'Above ' + r.min + '–' + r.max + ' h';
+}
+
+/* ============================================================
+   Rendering — inputs and chrome
+   ============================================================ */
+function renderInputs(){
+  var h24 = state.time.h24, m = state.time.m;
+  var hhEl = $('#hh'), mmEl = $('#mm');
+  hhEl.value = state.clock12 ? String(h24 % 12 || 12) : String(h24).padStart(2, '0');
+  mmEl.value = String(m).padStart(2, '0');
+  $('#merGroup').hidden = !state.clock12;
+  setMer(h24 < 12 ? 'AM' : 'PM');
+}
+function setMer(mer){
+  $('#merAM').setAttribute('aria-pressed', String(mer === 'AM'));
+  $('#merPM').setAttribute('aria-pressed', String(mer === 'PM'));
+}
+function currentMer(){ return $('#merAM').getAttribute('aria-pressed') === 'true' ? 'AM' : 'PM'; }
+
+function syncModeUI(){
+  $('#timeLabel').textContent = state.mode === 'wake' ? 'Wake up at' : 'Go to sleep at';
+  document.getElementById('modeWake').checked = state.mode === 'wake';
+  document.getElementById('modeSleep').checked = state.mode === 'sleep';
+}
+function syncClockUI(){
+  document.getElementById('clock12').checked = state.clock12;
+  document.getElementById('clock24').checked = !state.clock12;
+}
+
+function updateLede(){
+  var r = rec();
+  $('#lede').textContent =
+    'Enter the time you know — a bedtime or a wake-up time. You get four plan options built on ' +
+    state.cycle + '-minute cycles and ' + state.fall + ' minutes to fall asleep, ranked against the recommended ' +
+    r.min + '–' + r.max + ' hours for ' + r.label.toLowerCase() + '.';
+}
+function updateSettingsSummary(){
+  $('#settingsSummary').textContent =
+    state.fall + ' min to fall asleep · ' + state.cycle + ' min cycles · ' + rec().label + ' · ' +
+    (state.clock12 ? '12-hour' : '24-hour') + ' clock';
+  $('#ageHint').textContent = rec().hint;
+}
+function updateNowClock(){
+  var d = new Date();
+  $('#nowClock').textContent = fmtT(d.getHours() * 60 + d.getMinutes()).text;
+  $('#nowClock').setAttribute('datetime', d.toISOString());
+}
+function updatePresets(){
+  document.querySelectorAll('.preset').forEach(function(btn){
+    var p = PRESETS[btn.dataset.preset];
+    var on = p && state.preset === btn.dataset.preset;
+    btn.setAttribute('aria-pressed', String(!!on));
+  });
+}
+
+/* ============================================================
+   Rendering — result cards
+   ============================================================ */
+function timeBlockHTML(opt){
+  var main = state.mode === 'wake' ? opt.bed : opt.wake;
+  var label = state.mode === 'wake' ? 'Bedtime' : 'Wake-up time';
+  var f = fmtT(main.min);
+  var big = f.main + (f.mer ? '<span class="mer">' + f.mer + '</span>' : '');
+  var note = '';
+  if (opt.isBest && opt.status !== 'in'){
+    note = '<p class="card-note">Closest option available — still ' +
+      (opt.status === 'below' ? 'below' : 'above') + ' your ' + rec().min + '–' + rec().max + ' hour range.</p>';
+  }
+  return '<div class="time-block">' +
+    '<span class="t-label">' + label + '</span>' +
+    '<div class="time-big tnum">' + big + '</div>' +
+    '<span class="t-day">' + dayLabel(main.date) + '</span>' +
+    note + '</div>';
+}
+
+function statsHTML(opt){
+  var rows;
+  if (state.mode === 'wake'){
+    rows = [
+      { label: 'Fall asleep', t: opt.fall },
+      { label: 'Wake up',     t: opt.wake }
+    ];
+  } else {
+    rows = [
+      { label: 'Bedtime',     t: opt.bed },
+      { label: 'Fall asleep', t: opt.fall }
+    ];
+  }
+  var cells = rows.map(function(row){
+    var f = fmtT(row.t.min);
+    return '<div class="stat"><span class="stat-label">' + row.label + '</span>' +
+      '<span class="stat-value tnum">' + f.text + '<span class="stat-day">' + dayLabel(row.t.date) + '</span></span></div>';
+  });
+  cells.push('<div class="stat"><span class="stat-label">Sleep cycles</span><span class="stat-value tnum">' + opt.cycles + '</span></div>');
+  cells.push('<div class="stat"><span class="stat-label">Total sleep</span><span class="stat-value tnum">' + SleepEngine.fmtDur(opt.sleepMin) + '</span></div>');
+  return '<div class="stats">' + cells.join('') + '</div>';
+}
+
+function timelineHTML(opt, big){
+  var lead = '<div class="tl-seg tl-seg--lead" style="flex:' + state.fall + ' 1 0">' +
+    '<span class="tl-dot tl-dot--start"></span></div>';
+  var segs = '';
+  for (var i = 0; i < opt.cycles; i++){
+    var last = i === opt.cycles - 1;
+    segs += '<div class="tl-seg" style="flex:' + state.cycle + ' 1 0">' +
+      '<span class="tl-dot' + (last ? ' tl-dot--end' : '') + '"></span></div>';
+  }
+  var labels = '';
+  if (big){
+    var bed = fmtT(opt.bed.min), wake = fmtT(opt.wake.min);
+    labels = '<div class="tl-labels"><span>' + bed.text + ' · get into bed</span><span>' + wake.text + ' · wake up</span></div>';
+  }
+  return '<div class="timeline' + (big ? ' timeline--lg' : '') + '" aria-hidden="true">' + lead + segs + '</div>' + labels;
+}
+
+function meterHTML(opt){
+  var MAX = 14 * 60;
+  var r = rec();
+  var bandL = (r.min * 60 / MAX) * 100;
+  var bandW = ((r.max - r.min) * 60 / MAX) * 100;
+  var markL = Math.min(98.5, Math.max(1.5, opt.sleepMin / MAX * 100));
+  var st = opt.status;
+  return '<div class="meter" role="img" aria-label="' + SleepEngine.fmtDur(opt.sleepMin) + ' of sleep, ' + statusText(opt).toLowerCase() + '">' +
+    '<div class="meter-track">' +
+      '<div class="meter-band" style="left:' + bandL + '%;width:' + bandW + '%"></div>' +
+      '<div class="meter-mark ' + (st === 'in' ? '' : 'is-' + st) + '" style="left:' + markL + '%"></div>' +
+    '</div>' +
+    '<div class="meter-foot"><span class="meter-status is-' + st + '">' + statusText(opt) + '</span>' +
+    '<span class="meter-range">Recommended ' + r.min + '–' + r.max + ' h</span></div>' +
+  '</div>';
+}
+
+function actionsHTML(opt){
+  var fav = state.favourite === opt.cycles;
+  var cmp = state.compare.has(opt.cycles);
+  return '<div class="actions">' +
+    '<button type="button" class="icon-btn star-btn' + (fav ? ' is-on' : '') + '" data-action="fav" data-cycles="' + opt.cycles +
+      '" aria-pressed="' + fav + '" aria-label="' + (fav ? 'Remove your pick' : 'Pick the ' + opt.cycles + '-cycle option') +
+      '" title="Mark as your pick">' + svgIcon('star', 18, fav) + '</button>' +
+    '<button type="button" class="btn btn-ghost btn-sm cmp-btn' + (cmp ? ' is-on' : '') + '" data-action="compare" data-cycles="' + opt.cycles +
+      '" aria-pressed="' + cmp + '">Compare</button>' +
+  '</div>';
+}
+
+function badgesHTML(opt){
+  var out = badgeHTML(badgeKind(opt));
+  if (state.favourite === opt.cycles){
+    out += '<span class="pick-chip">' + svgIcon('star', 12, true) + 'Your pick</span>';
+  }
+  return '<div class="badges">' + out + '</div>';
+}
+
+function cardHTML(opt, featured){
+  return '<article class="card' + (featured ? ' card-featured' : ' card-compact') +
+    (state.favourite === opt.cycles ? ' is-fav' : '') + '" data-cycles="' + opt.cycles + '">' +
+    '<div class="card-top">' + badgesHTML(opt) + actionsHTML(opt) + '</div>' +
+    '<div class="' + (featured ? 'feat-grid' : 'card-body') + '">' +
+      timeBlockHTML(opt) +
+      '<div class="feat-data">' + statsHTML(opt) + timelineHTML(opt, featured) + meterHTML(opt) + '</div>' +
+    '</div>' +
+  '</article>';
+}
+
+function emptyHTML(){
+  return '<div class="empty">' +
+    '<svg class="ic" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>' +
+    '<p>Enter a valid time above and your sleep-cycle options will appear here.</p></div>';
+}
+
+function renderResults(){
+  var body = $('#resultsBody');
+  if (!state.results){
+    $('#resultsTitle').textContent = 'Results';
+    $('#resultsSub').textContent = 'Waiting for a valid time';
+    body.innerHTML = emptyHTML();
+    renderTray();
+    return;
+  }
+  var res = state.results;
+  var r = rec();
+  var anchorT = fmtT(res.anchor.min).text;
+  $('#resultsTitle').textContent = state.mode === 'wake'
+    ? 'Bedtimes for a ' + anchorT + ' wake-up'
+    : 'Wake-up times for a ' + anchorT + ' bedtime';
+  var sub = res.options.length + ' options · ranked against ' + r.min + '–' + r.max + ' h · closest to ' +
+    (Math.round(((r.min + r.max) / 2) * 10) / 10) + ' h first';
+  if (state.favourite != null) sub += ' · your pick: ' + state.favourite + ' cycles';
+  $('#resultsSub').textContent = sub;
+
+  var featured = res.options[0];
+  var rest = res.options.slice(1);
+  var html = cardHTML(featured, true);
+  if (rest.length){
+    html += '<div class="card-grid">' + rest.map(function(o){ return cardHTML(o, false); }).join('') + '</div>';
+  }
+  body.innerHTML = html;
+  renderTray();
+}
+
+function renderTray(){
+  var tray = $('#tray');
+  var n = state.compare.size;
+  var show = n >= 2;
+  tray.classList.toggle('is-hidden', !show);
+  tray.setAttribute('aria-hidden', String(!show));
+  document.body.classList.toggle('tray-open', show);
+  $('#trayText').textContent = n + ' of ' + (state.results ? state.results.options.length : 4) + ' options selected';
+}
+
+/* ============================================================
+   Compare modal
+   ============================================================ */
+var lastFocused = null;
+
+function compareTableHTML(){
+  var res = state.results;
+  if (!res) return '';
+  var picked = res.options.filter(function(o){ return state.compare.has(o.cycles); });
+  var r = rec();
+
+  function timeCell(t){
+    var f = fmtT(t.min);
+    return '<span class="cell-time tnum">' + f.text + '</span><span class="cell-day">' + dayLabel(t.date) + '</span>';
+  }
+  function statusCell(opt){
+    if (opt.status === 'in') return '<span class="status-in">Within range</span>';
+    var d = opt.status === 'below' ? (r.min * 60 - opt.sleepMin) : (opt.sleepMin - r.max * 60);
+    return '<span class="status-' + (opt.status === 'below' ? 'below' : 'above') + '">' +
+      SleepEngine.fmtDur(d) + ' ' + (opt.status === 'below' ? 'short' : 'over') + '</span>';
+  }
+
+  var head = '<tr><th scope="col"><span class="sr-only">Option</span></th>' + picked.map(function(o){
+    var cls = state.favourite === o.cycles ? ' class="col-fav"' : '';
+    return '<th scope="col"' + cls + '>' + o.cycles + ' cycles<span class="cell-day">' + SleepEngine.fmtDur(o.sleepMin) +
+      (state.favourite === o.cycles ? ' · your pick' : '') + '</span></th>';
+  }).join('') + '</tr>';
+
+  var rows = [];
+  function row(label, cellFn){
+    rows.push('<tr><th scope="row">' + label + '</th>' + picked.map(function(o){
+      var cls = state.favourite === o.cycles ? ' class="col-fav"' : '';
+      return '<td' + cls + '>' + cellFn(o) + '</td>';
+    }).join('') + '</tr>');
+  }
+  row(state.mode === 'wake' ? 'Bedtime' : 'Wake-up time', function(o){
+    return timeCell(state.mode === 'wake' ? o.bed : o.wake);
+  });
+  row('Fall asleep', function(o){ return timeCell(o.fall); });
+  row(state.mode === 'wake' ? 'Wake up' : 'Bedtime', function(o){
+    return timeCell(state.mode === 'wake' ? o.wake : o.bed);
+  });
+  row('Sleep cycles', function(o){ return '<span class="tnum">' + o.cycles + '</span>'; });
+  row('Total sleep', function(o){ return '<span class="tnum">' + SleepEngine.fmtDur(o.sleepMin) + '</span>'; });
+  row('Against ' + r.min + '–' + r.max + ' h', statusCell);
+
+  return '<div class="cmp-scroll"><table class="cmp-table">' +
+    '<caption class="sr-only">Side-by-side comparison of the selected sleep-cycle options</caption>' +
+    '<thead>' + head + '</thead><tbody>' + rows.join('') + '</tbody></table></div>';
+}
+
+function openModal(){
+  if (state.compare.size < 2) return;
+  lastFocused = document.activeElement;
+  $('#modalBody').innerHTML = compareTableHTML();
+  var root = $('#modalRoot');
+  root.classList.remove('is-hidden');
+  root.setAttribute('aria-hidden', 'false');
+  $('#modalClose').focus();
+}
+function closeModal(){
+  var root = $('#modalRoot');
+  root.classList.add('is-hidden');
+  root.setAttribute('aria-hidden', 'true');
+  if (lastFocused && document.contains(lastFocused)) lastFocused.focus();
+  lastFocused = null;
+}
+function modalOpen(){ return !$('#modalRoot').classList.contains('is-hidden'); }
+
+/* ============================================================
+   Compute + sync
+   ============================================================ */
+function showError(msg){
+  $('#timeErrorText').textContent = msg;
+  $('#timeError').hidden = false;
+}
+function clearError(){ $('#timeError').hidden = true; }
+
+function tryParseInputs(){
+  var res = SleepEngine.parseTime($('#hh').value, $('#mm').value, state.clock12, currentMer());
+  if (res.ok){
+    state.valid = true;
+    state.time = { h24: res.h24, m: res.m };
+    clearError();
+  } else {
+    state.valid = false;
+    showError(res.error);
+  }
+}
+
+function compute(){
+  if (state.valid){
+    var r = rec();
+    state.results = SleepEngine.compute(new Date(), state.time.h24, state.time.m, state.mode, {
+      fallMin: state.fall,
+      cycleMin: state.cycle,
+      recMinH: r.min,
+      recMaxH: r.max
+    });
+    var live = new Set(state.results.options.map(function(o){ return o.cycles; }));
+    state.compare = new Set(Array.from(state.compare).filter(function(c){ return live.has(c); }));
+    if (state.favourite != null && !live.has(state.favourite)) state.favourite = null;
+  }
+  /* While the field is invalid we keep the last valid results on screen;
+     the error message explains what needs fixing. */
+  renderResults();
+}
+
+function renderAll(){
+  syncModeUI();
+  syncClockUI();
+  renderInputs();
+  updateLede();
+  updateSettingsSummary();
+  updateNowClock();
+  updatePresets();
+  compute();
+}
+
+/* ============================================================
+   Events
+   ============================================================ */
+function setPresetKey(key){
+  state.preset = key;
+  updatePresets();
+}
+function detectPreset(){
+  state.preset = null;
+  for (var k in PRESETS){
+    var p = PRESETS[k];
+    if (p.mode === state.mode && p.h === state.time.h24 && p.m === state.time.m){ state.preset = k; break; }
+  }
+  updatePresets();
+}
+
+function onTimeInput(){
+  tryParseInputs();
+  if (state.valid) detectPreset();
+  compute();
+}
+
+function stepField(el, delta){
+  var isHH = el.id === 'hh';
+  var v = parseInt(el.value, 10);
+  if (isNaN(v)) v = 0;
+  var max = isHH ? (state.clock12 ? 12 : 23) : 59;
+  var min = isHH && state.clock12 ? 1 : 0;
+  var next = v + delta;
+  if (next > max) next = min;
+  if (next < min) next = max;
+  el.value = isHH && !state.clock12 ? String(next).padStart(2, '0') : String(next);
+  onTimeInput();
+}
+
+function bindEvents(){
+  /* Mode switch */
+  document.querySelectorAll('input[name="mode"]').forEach(function(input){
+    input.addEventListener('change', function(){
+      if (!input.checked) return;
+      state.mode = input.value;
+      syncModeUI();
+      detectPreset();
+      compute();
+    });
+  });
+
+  /* Time fields */
+  $('#hh').addEventListener('input', onTimeInput);
+  $('#mm').addEventListener('input', onTimeInput);
+  $('#hh').addEventListener('focus', function(e){ e.target.select(); });
+  $('#mm').addEventListener('focus', function(e){ e.target.select(); });
+  /* Re-pad the field from canonical state once editing finishes */
+  [$('#hh'), $('#mm')].forEach(function(el){
+    el.addEventListener('blur', function(){ if (state.valid) renderInputs(); });
+  });
+  [$('#hh'), $('#mm')].forEach(function(el){
+    el.addEventListener('keydown', function(e){
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown'){
+        e.preventDefault();
+        var step = e.shiftKey ? 5 : 1;
+        stepField(el, e.key === 'ArrowUp' ? step : -step);
+      }
+    });
+  });
+
+  /* AM / PM */
+  [$('#merAM'), $('#merPM')].forEach(function(btn){
+    btn.addEventListener('click', function(){ setMer(btn.dataset.mer); onTimeInput(); });
+  });
+
+  /* Use current time */
+  $('#nowBtn').addEventListener('click', function(){
+    var d = new Date();
+    state.time = { h24: d.getHours(), m: d.getMinutes() };
+    renderInputs();
+    tryParseInputs();
+    detectPreset();
+    compute();
+  });
+
+  /* Quick picks */
+  document.querySelectorAll('.preset').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var p = PRESETS[btn.dataset.preset];
+      if (!p) return;
+      state.mode = p.mode;
+      state.time = { h24: p.h, m: p.m };
+      syncModeUI();
+      renderInputs();
+      tryParseInputs();
+      setPresetKey(btn.dataset.preset);
+      compute();
+    });
+  });
+
+  /* Settings */
+  $('#inFall').addEventListener('input', function(){
+    var v = parseInt(this.value, 10);
+    if (isNaN(v) || v < 0 || v > 90){ this.setAttribute('aria-invalid', 'true'); return; }
+    this.removeAttribute('aria-invalid');
+    state.fall = v;
+    savePrefs(); updateLede(); updateSettingsSummary(); compute();
+  });
+  $('#inFall').addEventListener('change', function(){
+    if (this.getAttribute('aria-invalid')){ this.value = String(state.fall); this.removeAttribute('aria-invalid'); }
+  });
+  $('#inCycle').addEventListener('input', function(){
+    var v = parseInt(this.value, 10);
+    if (isNaN(v) || v < 60 || v > 120){ this.setAttribute('aria-invalid', 'true'); return; }
+    this.removeAttribute('aria-invalid');
+    state.cycle = v;
+    savePrefs(); updateLede(); updateSettingsSummary(); compute();
+  });
+  $('#inCycle').addEventListener('change', function(){
+    if (this.getAttribute('aria-invalid')){ this.value = String(state.cycle); this.removeAttribute('aria-invalid'); }
+  });
+  $('#ageSel').addEventListener('change', function(){
+    if (!SleepEngine.AGE_GROUPS[this.value]) return;
+    state.age = this.value;
+    savePrefs(); updateLede(); updateSettingsSummary(); compute();
+  });
+  document.querySelectorAll('input[name="clock"]').forEach(function(input){
+    input.addEventListener('change', function(){
+      if (!input.checked) return;
+      state.clock12 = input.value === '12';
+      savePrefs();
+      renderInputs();
+      updateSettingsSummary();
+      updateNowClock();
+      compute();
+    });
+  });
+
+  /* Card actions (delegated) */
+  $('#resultsBody').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var cycles = parseInt(btn.dataset.cycles, 10);
+    var action = btn.dataset.action;
+    if (action === 'fav'){
+      state.favourite = state.favourite === cycles ? null : cycles;
+      savePrefs();
+      renderResults();
+      refocus('[data-action="fav"][data-cycles="' + cycles + '"]');
+    } else if (action === 'compare'){
+      if (state.compare.has(cycles)) state.compare.delete(cycles);
+      else state.compare.add(cycles);
+      renderResults();
+      refocus('[data-action="compare"][data-cycles="' + cycles + '"]');
+    }
+  });
+
+  /* Tray + modal */
+  $('#trayClear').addEventListener('click', function(){
+    state.compare.clear();
+    renderResults();
+  });
+  $('#trayCompare').addEventListener('click', openModal);
+  $('#modalClose').addEventListener('click', closeModal);
+  $('#modalRoot').addEventListener('click', function(e){
+    if (e.target.hasAttribute('data-close')) closeModal();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && modalOpen()) closeModal();
+    if (e.key === 'Tab' && modalOpen()){
+      var focusables = $('#modalCard').querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!focusables.length) return;
+      var first = focusables[0], last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+    }
+  });
+}
+
+function refocus(sel){
+  var el = document.querySelector('#resultsBody ' + sel);
+  if (el) el.focus();
+}
+
+/* ============================================================
+   Init
+   ============================================================ */
+loadPrefs();
+$('#inFall').value = String(state.fall);
+$('#inCycle').value = String(state.cycle);
+$('#ageSel').value = state.age;
+bindEvents();
+renderAll();
+
+requestAnimationFrame(function(){
+  requestAnimationFrame(function(){ document.body.classList.remove('preload'); });
+});
+
+/* Keep the clock and the day-relative labels honest. */
+var lastMinuteKey = '';
+setInterval(function(){
+  updateNowClock();
+  var d = new Date();
+  var key = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate() + '-' + d.getHours() + '-' + d.getMinutes();
+  if (key !== lastMinuteKey){
+    if (lastMinuteKey){
+      /* Refresh day labels — but never yank focus out from under the user */
+      var active = document.activeElement;
+      var busy = modalOpen() || (active && $('#resultsBody').contains(active)) ||
+                 (active && $('#modalCard') && $('#modalCard').contains(active));
+      if (!busy) compute();
+    }
+    lastMinuteKey = key;
+  }
+}, 30000);
+lastMinuteKey = (function(){ var d = new Date(); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate() + '-' + d.getHours() + '-' + d.getMinutes(); })();
+
+})();
+</script>
+</body>
+</html>
